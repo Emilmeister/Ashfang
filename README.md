@@ -24,3 +24,9 @@ npm run dev
 - `src/scenes/BootScene.ts` — базовая загрузочная сцена;
 - `src/scenes/MenuScene.ts` — шаблон главного меню;
 - `src/scenes/LevelScene.ts` — шаблон игрового уровня.
+
+
+## CI/CD
+
+- На каждый `pull_request` запускается quality gate (`lint`, `test`, `build`).
+- После успешных проверок выполняется deploy preview на GitHub Pages для PR (для веток из этого репозитория) и в PR добавляется комментарий со ссылкой на предпросмотр.
