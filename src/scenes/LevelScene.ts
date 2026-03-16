@@ -3,11 +3,12 @@ import Phaser from 'phaser';
 const PLAYER_SPEED = 240;
 const MAP_WIDTH = 2200;
 const MAP_HEIGHT = 1400;
+const PLAYER_TEXTURE_KEY = 'player-rect';
 
 export class LevelScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
 
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
 
   private fpsText!: Phaser.GameObjects.Text;
 
@@ -25,6 +26,7 @@ export class LevelScene extends Phaser.Scene {
   create(): void {
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    this.cameras.main.setBackgroundColor(0x1a1a1a);
 
     this.add.rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0x1a1a1a).setDepth(-10);
 
@@ -69,10 +71,16 @@ export class LevelScene extends Phaser.Scene {
       obstacles.add(platform);
     });
 
-    this.player = this.physics.add.sprite(100, 100, '__DEFAULT');
-    this.player
-      .setDisplaySize(40, 40)
-      .setTint(0x50fa7b)
+    if (!this.textures.exists(PLAYER_TEXTURE_KEY)) {
+      const g = this.add.graphics({ x: 0, y: 0 });
+      g.fillStyle(0x50fa7b, 1);
+      g.fillRect(0, 0, 40, 40);
+      g.generateTexture(PLAYER_TEXTURE_KEY, 40, 40);
+      g.destroy();
+    }
+
+    this.player = this.physics.add
+      .sprite(100, 100, PLAYER_TEXTURE_KEY)
       .setCollideWorldBounds(true)
       .setDrag(900, 900)
       .setMaxVelocity(PLAYER_SPEED, PLAYER_SPEED);
@@ -80,27 +88,30 @@ export class LevelScene extends Phaser.Scene {
     this.physics.add.collider(this.player, obstacles);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
 
-    this.cursors = this.input.keyboard?.createCursorKeys() ?? ({} as Phaser.Types.Input.Keyboard.CursorKeys);
-
     const keyboard = this.input.keyboard;
-    if (!keyboard) {
-      return;
+
+    this.cursors = keyboard?.createCursorKeys();
+
+    if (keyboard) {
+      this.wasdKeys = keyboard.addKeys({
+        up: Phaser.Input.Keyboard.KeyCodes.W,
+        down: Phaser.Input.Keyboard.KeyCodes.S,
+        left: Phaser.Input.Keyboard.KeyCodes.A,
+        right: Phaser.Input.Keyboard.KeyCodes.D,
+      }) as {
+        up: Phaser.Input.Keyboard.Key;
+        down: Phaser.Input.Keyboard.Key;
+        left: Phaser.Input.Keyboard.Key;
+        right: Phaser.Input.Keyboard.Key;
+      };
+
+      keyboard.once('keydown-ESC', () => {
+        this.scene.start('Menu');
+      });
     }
 
-    this.wasdKeys = keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D,
-    }) as {
-      up: Phaser.Input.Keyboard.Key;
-      down: Phaser.Input.Keyboard.Key;
-      left: Phaser.Input.Keyboard.Key;
-      right: Phaser.Input.Keyboard.Key;
-    };
-
-    keyboard.once('keydown-ESC', () => {
-      this.scene.start('Menu');
+    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
+      this.fpsText.setPosition(gameSize.width - 24, 24);
     });
   }
 
@@ -109,10 +120,10 @@ export class LevelScene extends Phaser.Scene {
       return;
     }
 
-    const moveLeft = this.cursors.left?.isDown || this.wasdKeys?.left.isDown;
-    const moveRight = this.cursors.right?.isDown || this.wasdKeys?.right.isDown;
-    const moveUp = this.cursors.up?.isDown || this.wasdKeys?.up.isDown;
-    const moveDown = this.cursors.down?.isDown || this.wasdKeys?.down.isDown;
+    const moveLeft = Boolean(this.cursors?.left?.isDown || this.wasdKeys?.left.isDown);
+    const moveRight = Boolean(this.cursors?.right?.isDown || this.wasdKeys?.right.isDown);
+    const moveUp = Boolean(this.cursors?.up?.isDown || this.wasdKeys?.up.isDown);
+    const moveDown = Boolean(this.cursors?.down?.isDown || this.wasdKeys?.down.isDown);
 
     let velocityX = 0;
     let velocityY = 0;

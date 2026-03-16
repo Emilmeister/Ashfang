@@ -6,8 +6,12 @@ import { MenuScene } from '../scenes/MenuScene';
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'app',
-  width: 1280,
-  height: 720,
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  },
   backgroundColor: '#111111',
   physics: {
     default: 'arcade',
