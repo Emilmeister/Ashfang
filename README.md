@@ -12,7 +12,9 @@ npm run dev
 ## Доступные команды
 
 - `npm run dev` — запуск dev-сервера;
-- `npm run build` — проверка TypeScript + production-сборка;
+- `npm run typecheck` — проверка TypeScript;
+- `npm run test` — запуск тестового quality gate (typecheck);
+- `npm run build` — production-сборка;
 - `npm run preview` — локальный preview production-сборки;
 - `npm run lint` — запуск ESLint.
 
