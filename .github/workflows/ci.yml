@@ -105,17 +105,37 @@ jobs:
 
       - name: Deploy preview to GitHub Pages
         id: deploy
+        continue-on-error: true
         uses: actions/deploy-pages@v4
         with:
           preview: true
 
       - name: Comment preview URL
+        if: steps.deploy.outcome == 'success'
         uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
             const previewUrl = "${{ steps.deploy.outputs.page_url }}";
             const body = `✅ Preview deployed: ${previewUrl}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+
+      - name: Comment preview deploy warning
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const body = [
+              "⚠️ Не удалось создать GitHub Pages preview deployment.",
+              "Проверьте, что GitHub Pages включен в репозитории: https://github.com/${context.repo.owner}/${context.repo.repo}/settings/pages",
+              "Также учтите, что `preview: true` в `actions/deploy-pages` доступен ограниченно (alpha) и может возвращать 404.",
+            ].join("\n");
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
