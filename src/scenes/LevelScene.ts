@@ -5,18 +5,21 @@ const MAP_WIDTH = 2200;
 const MAP_HEIGHT = 1400;
 const PLAYER_TEXTURE_KEY = 'player-rect';
 const ENEMY_TEXTURE_KEY = 'enemy-rect';
-const ATTACK_COOLDOWN_MS = 550;
-const ATTACK_DAMAGE = 20;
+const ATTACK_COOLDOWN_MS = 450;
+const ATTACK_DAMAGE = 25;
 const ENEMY_MAX_HP = 100;
-const ATTACK_RANGE = 56;
-const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(35);
+const ATTACK_RANGE = 72;
+const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(42);
+
+type EnemyState = {
+  sprite: Phaser.Physics.Arcade.Sprite;
+  hp: number;
+};
 
 export class LevelScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
 
-  private enemy?: Phaser.Physics.Arcade.Sprite;
-
-  private enemyHp = ENEMY_MAX_HP;
+  private enemies: EnemyState[] = [];
 
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
 
@@ -99,21 +102,7 @@ export class LevelScene extends Phaser.Scene {
       obstacles.add(platform);
     });
 
-    if (!this.textures.exists(PLAYER_TEXTURE_KEY)) {
-      const g = this.add.graphics({ x: 0, y: 0 });
-      g.fillStyle(0x50fa7b, 1);
-      g.fillRect(0, 0, 40, 40);
-      g.generateTexture(PLAYER_TEXTURE_KEY, 40, 40);
-      g.destroy();
-    }
-
-    if (!this.textures.exists(ENEMY_TEXTURE_KEY)) {
-      const g = this.add.graphics({ x: 0, y: 0 });
-      g.fillStyle(0xff5555, 1);
-      g.fillRect(0, 0, 40, 40);
-      g.generateTexture(ENEMY_TEXTURE_KEY, 40, 40);
-      g.destroy();
-    }
+    this.createTextures();
 
     this.player = this.physics.add
       .sprite(100, 100, PLAYER_TEXTURE_KEY)
@@ -121,18 +110,9 @@ export class LevelScene extends Phaser.Scene {
       .setDrag(900, 900)
       .setMaxVelocity(PLAYER_SPEED, PLAYER_SPEED);
 
-    this.enemy = this.physics.add
-      .sprite(340, 120, ENEMY_TEXTURE_KEY)
-      .setImmovable(true)
-      .setCollideWorldBounds(true)
-      .setPushable(false);
-
     this.physics.add.collider(this.player, obstacles);
-
-    if (this.enemy) {
-      this.physics.add.collider(this.enemy, obstacles);
-      this.physics.add.collider(this.player, this.enemy);
-    }
+    this.spawnEnemies(obstacles);
+    this.combatText.setText(this.getCombatHudText());
 
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
 
@@ -205,63 +185,158 @@ export class LevelScene extends Phaser.Scene {
     this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
   }
 
-  private performAttack(time: number): void {
-    this.lastAttackTime = time;
-    this.player.setTintFill(0xf1fa8c);
-    this.time.delayedCall(100, () => {
-      this.player.clearTint();
-    });
-
-    const enemy = this.enemy;
-
-    if (!enemy?.active) {
-      this.combatText.setText('Враг повержен. Удар в пустоту.');
-      return;
+  private createTextures(): void {
+    if (!this.textures.exists(PLAYER_TEXTURE_KEY)) {
+      const g = this.add.graphics({ x: 0, y: 0 });
+      g.fillStyle(0x50fa7b, 1);
+      g.fillRect(0, 0, 40, 40);
+      g.generateTexture(PLAYER_TEXTURE_KEY, 40, 40);
+      g.destroy();
     }
 
-    const toEnemy = new Phaser.Math.Vector2(enemy.x - this.player.x, enemy.y - this.player.y);
-    const enemyDistance = toEnemy.length();
+    if (!this.textures.exists(ENEMY_TEXTURE_KEY)) {
+      const g = this.add.graphics({ x: 0, y: 0 });
+      g.fillStyle(0xff5555, 1);
+      g.fillRect(0, 0, 40, 40);
+      g.generateTexture(ENEMY_TEXTURE_KEY, 40, 40);
+      g.destroy();
+    }
+  }
 
-    if (enemyDistance === 0 || enemyDistance > ATTACK_RANGE) {
+  private spawnEnemies(obstacles: Phaser.Physics.Arcade.StaticGroup): void {
+    const enemySpawnPoints: Array<{ x: number; y: number }> = [
+      { x: 340, y: 120 },
+      { x: 560, y: 180 },
+      { x: 760, y: 140 },
+      { x: 980, y: 220 },
+      { x: 1200, y: 180 },
+    ];
+
+    enemySpawnPoints.forEach((spawnPoint, index) => {
+      const enemy = this.physics.add
+        .sprite(spawnPoint.x, spawnPoint.y, ENEMY_TEXTURE_KEY)
+        .setImmovable(true)
+        .setCollideWorldBounds(true)
+        .setPushable(false);
+
+      this.enemies.push({ sprite: enemy, hp: ENEMY_MAX_HP });
+
+      this.physics.add.collider(enemy, obstacles);
+      this.physics.add.collider(this.player, enemy);
+
+      this.tweens.add({
+        targets: enemy,
+        y: enemy.y - 8,
+        yoyo: true,
+        repeat: -1,
+        duration: 420 + index * 70,
+        ease: 'Sine.easeInOut',
+      });
+    });
+  }
+
+  private performAttack(time: number): void {
+    this.lastAttackTime = time;
+    this.playAttackAnimation();
+
+    const hitEnemies = this.enemies.filter((enemyState) => this.isEnemyHit(enemyState));
+
+    if (hitEnemies.length === 0) {
       this.combatText.setText(`Промах. КД ${this.getCooldownText(this.lastAttackTime)} сек`);
       return;
     }
 
-    const enemyDirection = toEnemy.normalize();
-    const facingAngle = Phaser.Math.Angle.Wrap(this.playerFacing.angle() - enemyDirection.angle());
+    hitEnemies.forEach((enemyState) => {
+      enemyState.hp = Math.max(0, enemyState.hp - ATTACK_DAMAGE);
 
-    if (Math.abs(facingAngle) > ATTACK_ARC_HALF_ANGLE) {
-      this.combatText.setText(`Промах по направлению. КД ${this.getCooldownText(this.lastAttackTime)} сек`);
-      return;
-    }
+      enemyState.sprite.setTintFill(0xffffff);
+      this.time.delayedCall(90, () => {
+        if (enemyState.sprite.active) {
+          enemyState.sprite.clearTint();
+        }
+      });
 
-    this.enemyHp = Math.max(0, this.enemyHp - ATTACK_DAMAGE);
-
-    enemy.setTintFill(0xffffff);
-    this.time.delayedCall(90, () => {
-      if (enemy.active) {
-        enemy.clearTint();
+      if (enemyState.hp <= 0) {
+        enemyState.sprite.disableBody(true, true);
       }
     });
 
     this.cameras.main.shake(90, 0.002);
 
-    if (this.enemyHp <= 0) {
-      enemy.disableBody(true, true);
-      this.combatText.setText('Попадание! Враг побежден.');
+    const aliveEnemies = this.enemies.filter((enemyState) => enemyState.hp > 0).length;
+
+    if (aliveEnemies === 0) {
+      this.combatText.setText('Комбо! Все враги побеждены.');
       return;
     }
 
-    this.combatText.setText(`Попадание! HP врага: ${this.enemyHp}. КД ${this.getCooldownText(this.lastAttackTime)} сек`);
+    this.combatText.setText(`Попадание x${hitEnemies.length}! Осталось врагов: ${aliveEnemies}. КД ${this.getCooldownText(this.lastAttackTime)} сек`);
+  }
+
+  private playAttackAnimation(): void {
+    this.player.setTintFill(0xf1fa8c);
+    this.player.setScale(1, 1);
+
+    this.tweens.add({
+      targets: this.player,
+      scaleX: 1.22,
+      scaleY: 0.86,
+      yoyo: true,
+      duration: 85,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.player.clearTint();
+        this.player.setScale(1, 1);
+      },
+    });
+
+    const slash = this.add
+      .arc(this.player.x, this.player.y, ATTACK_RANGE, this.getFacingAngle() - 35, this.getFacingAngle() + 35, false, 0xf1fa8c, 0.45)
+      .setStrokeStyle(3, 0xffffff, 0.85)
+      .setDepth(8);
+
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.25,
+      duration: 110,
+      ease: 'Quad.easeOut',
+      onComplete: () => slash.destroy(),
+    });
+  }
+
+  private isEnemyHit(enemyState: EnemyState): boolean {
+    if (!enemyState.sprite.active || enemyState.hp <= 0) {
+      return false;
+    }
+
+    const toEnemy = new Phaser.Math.Vector2(
+      enemyState.sprite.x - this.player.x,
+      enemyState.sprite.y - this.player.y,
+    );
+    const enemyDistance = toEnemy.length();
+
+    if (enemyDistance === 0 || enemyDistance > ATTACK_RANGE) {
+      return false;
+    }
+
+    const enemyDirection = toEnemy.normalize();
+    const facingAngle = Phaser.Math.Angle.Wrap(this.playerFacing.angle() - enemyDirection.angle());
+
+    return Math.abs(facingAngle) <= ATTACK_ARC_HALF_ANGLE;
   }
 
   private getCombatHudText(): string {
-    return `HP врага: ${this.enemyHp} | Урон: ${ATTACK_DAMAGE} | КД: ${(ATTACK_COOLDOWN_MS / 1000).toFixed(2)} сек`;
+    return `Врагов: ${this.enemies.length} | Урон: ${ATTACK_DAMAGE} | КД: ${(ATTACK_COOLDOWN_MS / 1000).toFixed(2)} сек`;
   }
 
   private getCooldownText(lastAttackTime: number): string {
     const availableAt = lastAttackTime + ATTACK_COOLDOWN_MS;
     const remainingMs = Math.max(0, availableAt - this.time.now);
     return (remainingMs / 1000).toFixed(2);
+  }
+
+  private getFacingAngle(): number {
+    return Phaser.Math.RadToDeg(this.playerFacing.angle());
   }
 }
