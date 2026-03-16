@@ -7,6 +7,7 @@
 - [Правила ведения документации](./DOCUMENTATION_RULES.md)
 - [Шаблон ADR](./templates/ADR_TEMPLATE.md)
 - [Декомпозиция задач для выпуска MVP](./project-management/mvp-roadmap-tasks.md)
+- [MVP scope и критерии успеха](./project-management/mvp-scope-success-criteria.md)
 - [Концепция игры Ashfang](./game-design/game-concept.md)
 
 ## Статус

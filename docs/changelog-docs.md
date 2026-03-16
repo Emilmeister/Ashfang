@@ -8,3 +8,5 @@
 - Уточнен формат документа по MVP: добавлен готовый список подзадач для Linear issue `DEV-7`.
 - Добавлено описание концепции игры Ashfang (`docs/game-design/game-concept.md`).
 - Обновлена карта документации: добавлена ссылка на концепцию игры.
+- Добавлен one-pager по задаче DEV-8: scope MVP и критерии успеха (`docs/project-management/mvp-scope-success-criteria.md`).
+- Обновлена карта документации: добавлена ссылка на one-pager по scope MVP.
