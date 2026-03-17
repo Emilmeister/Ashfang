@@ -6,6 +6,9 @@ const MAP_HEIGHT = 1400;
 const PLAYER_TEXTURE_KEY = 'player-wolf';
 const ENEMY_TEXTURE_KEY = 'enemy-fiend';
 const ATTACK_COOLDOWN_MS = 430;
+const ATTACK_STARTUP_MS = 90;
+const ATTACK_IMPACT_MS = 75;
+const ATTACK_RECOVER_MS = 130;
 const ATTACK_DAMAGE = 25;
 const ENEMY_MAX_HP = 70;
 const ATTACK_RANGE = 102;
@@ -14,6 +17,12 @@ const PLAYER_MAX_HP = 180;
 const PLAYER_HIT_COOLDOWN_MS = 650;
 const DOWNTIME_LIMIT_MS = 5000;
 const MAX_PRESSURE_SPAWNS = 3;
+const MOVEMENT_SMOOTHING = 0.22;
+const DASH_SPEED = 620;
+const DASH_DURATION_MS = 130;
+const DASH_COOLDOWN_MS = 1400;
+const ENEMY_STAGGER_MS = 210;
+const ENEMY_HIT_KNOCKBACK = 280;
 
 const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
 const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
@@ -29,7 +38,10 @@ type EnemyState = {
   speed: number;
   damage: number;
   lastHitTime: number;
+  staggerUntil: number;
 };
+
+type AttackPhase = 'idle' | 'startup' | 'impact' | 'recover';
 
 export class LevelScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -63,7 +75,19 @@ export class LevelScene extends Phaser.Scene {
 
   private attackKey?: Phaser.Input.Keyboard.Key;
 
+  private dashKey?: Phaser.Input.Keyboard.Key;
+
   private lastAttackTime = -Infinity;
+
+  private lastDashTime = -Infinity;
+
+  private dashEndTime = -Infinity;
+
+  private dashDirection = new Phaser.Math.Vector2(1, 0);
+
+  private movementVelocity = new Phaser.Math.Vector2();
+
+  private attackPhase: AttackPhase = 'idle';
 
   private playerFacing = new Phaser.Math.Vector2(1, 0);
 
@@ -240,6 +264,7 @@ export class LevelScene extends Phaser.Scene {
       };
 
       this.attackKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
       keyboard.on('keydown-ESC', () => this.togglePause());
     }
 
@@ -287,8 +312,15 @@ export class LevelScene extends Phaser.Scene {
       this.player.setFlipX(moveDirection.x < 0);
     }
 
-    const velocity = moveDirection.clone().scale(PLAYER_SPEED);
-    this.player.setVelocity(velocity.x, velocity.y);
+    const isDashing = time < this.dashEndTime;
+    if (!isDashing) {
+      const targetVelocity = moveDirection.clone().scale(PLAYER_SPEED);
+      this.movementVelocity.lerp(targetVelocity, MOVEMENT_SMOOTHING);
+      this.player.setVelocity(this.movementVelocity.x, this.movementVelocity.y);
+    } else {
+      const dashVelocity = this.dashDirection.clone().scale(DASH_SPEED);
+      this.player.setVelocity(dashVelocity.x, dashVelocity.y);
+    }
 
     if (!this.hasMoved && moveDirection.lengthSq() > 0) {
       this.hasMoved = true;
@@ -298,13 +330,18 @@ export class LevelScene extends Phaser.Scene {
     if (
       this.attackKey &&
       Phaser.Input.Keyboard.JustDown(this.attackKey) &&
-      time - this.lastAttackTime >= ATTACK_COOLDOWN_MS
+      time - this.lastAttackTime >= ATTACK_COOLDOWN_MS &&
+      this.attackPhase === 'idle'
     ) {
       if (!this.hasAttacked) {
         this.hasAttacked = true;
         this.advanceOnboarding(2);
       }
-      this.performAttack(time);
+      this.startAttack(time);
+    }
+
+    if (this.dashKey && Phaser.Input.Keyboard.JustDown(this.dashKey)) {
+      this.tryDash(time, moveDirection);
     }
 
     this.updateEnemies(time);
@@ -338,6 +375,7 @@ export class LevelScene extends Phaser.Scene {
         speed: spawnPoint.speed,
         damage: spawnPoint.damage,
         lastHitTime: -Infinity,
+        staggerUntil: -Infinity,
       };
 
       this.enemies.push(enemyState);
@@ -367,6 +405,7 @@ export class LevelScene extends Phaser.Scene {
       speed: 140,
       damage: 14,
       lastHitTime: -Infinity,
+      staggerUntil: -Infinity,
     };
 
     this.enemies.push(enemyState);
@@ -383,6 +422,10 @@ export class LevelScene extends Phaser.Scene {
     this.getAliveEnemies().forEach((enemyState) => {
       const direction = new Phaser.Math.Vector2(this.player.x - enemyState.sprite.x, this.player.y - enemyState.sprite.y);
       const distance = direction.length();
+
+      if (time < enemyState.staggerUntil) {
+        return;
+      }
 
       if (distance < 2) {
         enemyState.sprite.setVelocity(0, 0);
@@ -431,12 +474,41 @@ export class LevelScene extends Phaser.Scene {
     }
   }
 
-  private performAttack(time: number): void {
+  private startAttack(time: number): void {
     this.lastAttackTime = time;
     this.markMeaningfulAction();
     this.sound.play(ATTACK_SFX_KEY, { volume: 0.5 });
-    this.playAttackAnimation();
+    this.attackPhase = 'startup';
+    this.playAttackStartup();
 
+    this.time.delayedCall(ATTACK_STARTUP_MS, () => {
+      if (!this.player.active || this.isCompleting) {
+        return;
+      }
+
+      this.attackPhase = 'impact';
+      this.playAttackImpact();
+      this.resolveAttackImpact();
+    });
+
+    this.time.delayedCall(ATTACK_STARTUP_MS + ATTACK_IMPACT_MS, () => {
+      if (!this.player.active || this.isCompleting) {
+        return;
+      }
+
+      this.attackPhase = 'recover';
+      this.playAttackRecover();
+    });
+
+    this.time.delayedCall(ATTACK_STARTUP_MS + ATTACK_IMPACT_MS + ATTACK_RECOVER_MS, () => {
+      if (!this.player.active || this.isCompleting) {
+        return;
+      }
+      this.attackPhase = 'idle';
+    });
+  }
+
+  private resolveAttackImpact(): void {
     const hitEnemies = this.enemies.filter((enemyState) => this.isEnemyHit(enemyState));
 
     if (hitEnemies.length === 0) {
@@ -447,11 +519,31 @@ export class LevelScene extends Phaser.Scene {
     hitEnemies.forEach((enemyState) => {
       this.markMeaningfulAction(true);
       enemyState.hp = Math.max(0, enemyState.hp - ATTACK_DAMAGE);
-      enemyState.sprite.setTintFill(0xffffff);
+      enemyState.staggerUntil = this.time.now + ENEMY_STAGGER_MS;
+
+      const knockbackDirection = new Phaser.Math.Vector2(enemyState.sprite.x - this.player.x, enemyState.sprite.y - this.player.y);
+      if (knockbackDirection.lengthSq() > 0) {
+        knockbackDirection.normalize();
+      }
+
+      enemyState.sprite.setVelocity(
+        knockbackDirection.x * ENEMY_HIT_KNOCKBACK,
+        knockbackDirection.y * ENEMY_HIT_KNOCKBACK,
+      );
+      enemyState.sprite.setTintFill(0xfff1c1);
       this.time.delayedCall(90, () => {
         if (enemyState.sprite.active) {
           enemyState.sprite.clearTint();
         }
+      });
+
+      this.tweens.add({
+        targets: enemyState.sprite,
+        scaleX: 1.2,
+        scaleY: 0.84,
+        duration: 55,
+        yoyo: true,
+        ease: 'Quad.easeOut',
       });
 
       if (enemyState.hp <= 0) {
@@ -466,7 +558,18 @@ export class LevelScene extends Phaser.Scene {
     this.updateHud();
   }
 
-  private playAttackAnimation(): void {
+  private playAttackStartup(): void {
+    this.player.setTintFill(0xc8d6ff);
+    this.tweens.add({
+      targets: this.player,
+      scaleX: 1.1,
+      scaleY: 0.92,
+      duration: ATTACK_STARTUP_MS,
+      ease: 'Quad.easeOut',
+    });
+  }
+
+  private playAttackImpact(): void {
     const baseScaleX = this.player.scaleX;
     const baseScaleY = this.player.scaleY;
 
@@ -477,10 +580,9 @@ export class LevelScene extends Phaser.Scene {
       scaleX: baseScaleX * 1.22,
       scaleY: baseScaleY * 0.86,
       yoyo: true,
-      duration: 85,
+      duration: ATTACK_IMPACT_MS,
       ease: 'Quad.easeOut',
       onComplete: () => {
-        this.player.clearTint();
         this.player.setScale(baseScaleX, baseScaleY);
       },
     });
@@ -497,6 +599,44 @@ export class LevelScene extends Phaser.Scene {
       duration: 110,
       ease: 'Quad.easeOut',
       onComplete: () => slash.destroy(),
+    });
+  }
+
+  private playAttackRecover(): void {
+    this.player.clearTint();
+    this.tweens.add({
+      targets: this.player,
+      alpha: 0.92,
+      yoyo: true,
+      duration: ATTACK_RECOVER_MS,
+      ease: 'Sine.easeOut',
+      onComplete: () => this.player.setAlpha(1),
+    });
+  }
+
+  private tryDash(time: number, moveDirection: Phaser.Math.Vector2): void {
+    if (time - this.lastDashTime < DASH_COOLDOWN_MS || time < this.dashEndTime) {
+      return;
+    }
+
+    if (moveDirection.lengthSq() > 0) {
+      this.dashDirection.copy(moveDirection).normalize();
+    } else if (this.playerFacing.lengthSq() > 0) {
+      this.dashDirection.copy(this.playerFacing).normalize();
+    }
+
+    this.lastDashTime = time;
+    this.dashEndTime = time + DASH_DURATION_MS;
+    this.markMeaningfulAction();
+    this.advanceOnboarding(3);
+
+    this.player.setTint(0x9be7ff);
+    this.cameras.main.shake(75, 0.0018);
+
+    this.time.delayedCall(DASH_DURATION_MS, () => {
+      if (this.player.active) {
+        this.player.clearTint();
+      }
     });
   }
 
@@ -521,7 +661,11 @@ export class LevelScene extends Phaser.Scene {
   private updateHud(): void {
     const aliveEnemies = this.getAliveEnemies().length;
     const elapsedSeconds = Math.max(0, Math.round((this.time.now - this.levelStartTime) / 1000));
-    this.hudText.setText(`HP: ${this.playerHp}/${PLAYER_MAX_HP} | Враги: ${aliveEnemies} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.game.loop.actualFps)}`);
+    const dashRemainingMs = Math.max(0, DASH_COOLDOWN_MS - (this.time.now - this.lastDashTime));
+    const dashLabel = dashRemainingMs > 0 ? `${(dashRemainingMs / 1000).toFixed(1)}с` : 'готов';
+    this.hudText.setText(
+      `HP: ${this.playerHp}/${PLAYER_MAX_HP} | Враги: ${aliveEnemies} | Рывок: ${dashLabel} | Атака: ${this.attackPhase} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.game.loop.actualFps)}`,
+    );
 
     if (!this.portalUnlocked) {
       this.objectiveText.setText(`Цель: Уничтожь врагов (${aliveEnemies}) и войди в портал`);
@@ -549,7 +693,7 @@ export class LevelScene extends Phaser.Scene {
   private unlockPortal(): void {
     this.portalUnlocked = true;
     this.markMeaningfulAction();
-    this.advanceOnboarding(3);
+    this.advanceOnboarding(4);
     this.statusText.setText('Статус: Путь к боссу открыт');
     this.objectiveText.setText('Цель: Войди в портал, чтобы добраться до Сердца руин');
     this.dialogueText.setText('Ashfang: Путь открыт. Источник скверны рядом.');
@@ -598,6 +742,7 @@ export class LevelScene extends Phaser.Scene {
     const hints = [
       'Обучение: Двигайся WASD / стрелками. Управление не блокируется.',
       'Обучение: Нажми SPACE для атаки в сторону движения.',
+      'Обучение: SHIFT — короткий рывок с кулдауном для уклонения и входа в бой.',
       'Обучение: Победи всех врагов и войди в сияющий портал.',
       'Обучение: Портал открыт! Доберись до него, чтобы начать бой с боссом.',
     ];
@@ -612,7 +757,7 @@ export class LevelScene extends Phaser.Scene {
 
     this.time.delayedCall(13000, () => {
       if (!this.hasAttacked) {
-        this.showOnboarding('Подсказка: SPACE — твой быстрый удар. Используй его чаще.');
+        this.showOnboarding('Подсказка: атака проходит фазы startup → impact → recover. Лови момент impact.');
       }
     });
   }
@@ -627,8 +772,10 @@ export class LevelScene extends Phaser.Scene {
     if (stepIndex === 1) {
       this.showOnboarding('Отлично! Теперь попробуй атаку: SPACE.');
     } else if (stepIndex === 2) {
-      this.showOnboarding('Хорошо! Добей врагов и открой путь к порталу.');
+      this.showOnboarding('Теперь протестируй рывок: SHIFT, затем добей врагов.');
     } else if (stepIndex === 3) {
+      this.showOnboarding('Хорошо! Добей врагов и открой путь к порталу.');
+    } else if (stepIndex === 4) {
       this.showOnboarding('Финал этапа: войди в портал, чтобы встретить источник скверны.');
     }
   }
