@@ -189,11 +189,52 @@ export class BossScene extends Phaser.Scene {
       time - this.lastAttackTime >= ATTACK_COOLDOWN_MS
     ) {
       this.lastAttackTime = time;
+      this.playAttackAnimation();
       this.tryHitBoss();
     }
 
     this.updateBossAI();
     this.updateHud();
+  }
+
+
+  private playAttackAnimation(): void {
+    const baseScaleX = this.player.scaleX;
+    const baseScaleY = this.player.scaleY;
+
+    this.player.setTintFill(0xf1fa8c);
+
+    this.tweens.add({
+      targets: this.player,
+      scaleX: baseScaleX * 1.2,
+      scaleY: baseScaleY * 0.88,
+      yoyo: true,
+      duration: 85,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!this.player.active) {
+          return;
+        }
+
+        this.player.clearTint();
+        this.player.setScale(baseScaleX, baseScaleY);
+      },
+    });
+
+    const facingAngle = Phaser.Math.RadToDeg(this.playerFacing.angle());
+    const slash = this.add
+      .arc(this.player.x, this.player.y, ATTACK_RANGE, facingAngle - 40, facingAngle + 40, false, 0xf1fa8c, 0.42)
+      .setStrokeStyle(3, 0xffffff, 0.85)
+      .setDepth(8);
+
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.25,
+      duration: 110,
+      ease: 'Quad.easeOut',
+      onComplete: () => slash.destroy(),
+    });
   }
 
   private updateBossAI(): void {
