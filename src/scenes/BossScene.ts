@@ -35,6 +35,8 @@ export class BossScene extends Phaser.Scene {
 
   private statusText!: Phaser.GameObjects.Text;
 
+  private onboardingText!: Phaser.GameObjects.Text;
+
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
 
   private wasdKeys?: {
@@ -53,6 +55,8 @@ export class BossScene extends Phaser.Scene {
   private playerLastHitTime = -Infinity;
 
   private ending = false;
+
+  private epilogueShown = false;
 
   constructor() {
     super('Boss');
@@ -130,6 +134,18 @@ export class BossScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(20);
 
+    this.onboardingText = this.add
+      .text(1570, 20, 'Цель: Уклоняйся и атакуй SPACE, когда босс рядом.', {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: '#93c5fd',
+        align: 'right',
+        wordWrap: { width: 520 },
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(20);
+
     const keyboard = this.input.keyboard;
     this.cursors = keyboard?.createCursorKeys();
 
@@ -157,6 +173,7 @@ export class BossScene extends Phaser.Scene {
     });
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    this.playBossIntroStory();
     this.updateHud();
   }
 
@@ -321,11 +338,7 @@ export class BossScene extends Phaser.Scene {
     this.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.36 });
     this.boss.disableBody(true, true);
     this.player.setVelocity(0, 0);
-    this.dialogueText.setText('Победа! Сердце руин очищено. Нажми ENTER для возврата в меню.');
-    this.input.keyboard?.once('keydown-ENTER', () => {
-      this.sound.play(UI_CONFIRM_SFX_KEY, { volume: 0.45 });
-      this.scene.start('Menu');
-    });
+    this.playVictoryEpilogue();
   }
 
   private endWithFailure(): void {
@@ -352,5 +365,73 @@ export class BossScene extends Phaser.Scene {
     this.statusText.setText('Статус: Пауза');
     this.scene.launch('Pause', { sourceScene: this.scene.key });
     this.scene.pause();
+  }
+
+  private playBossIntroStory(): void {
+    this.time.delayedCall(1800, () => {
+      if (!this.ending) {
+        this.dialogueText.setText('Астрелия: Это Страж Сердца. Он хранит память о падшем мире.');
+      }
+    });
+
+    this.time.delayedCall(5200, () => {
+      if (!this.ending) {
+        this.dialogueText.setText('Ashfang: Я освобожу его и узнаю, кто расколол Белое Сердце.');
+      }
+    });
+  }
+
+  private playVictoryEpilogue(): void {
+    if (this.epilogueShown) {
+      return;
+    }
+
+    this.epilogueShown = true;
+    this.onboardingText.setVisible(false);
+
+    const overlay = this.add
+      .rectangle(800, 500, 1600, 1000, 0x05060f, 0.82)
+      .setScrollFactor(0)
+      .setDepth(30);
+
+    const title = this.add
+      .text(800, 270, 'Глава завершена: Эхо руин', {
+        fontFamily: 'Arial',
+        fontSize: '52px',
+        color: '#ffe8a3',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(31);
+
+    const body = this.add
+      .text(
+        800,
+        460,
+        'Сердце руин очищено, но в пепле вспыхнул новый след.\nАстрелия видит путь к северным бастионам Ургрима —\nтам просыпается осколок, способный подчинить целые кланы.\n\nНажми ENTER, чтобы вернуться в меню и начать следующий поход.',
+        {
+          fontFamily: 'Arial',
+          fontSize: '28px',
+          color: '#e2e8f0',
+          align: 'center',
+          wordWrap: { width: 1180 },
+        },
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(31);
+
+    this.tweens.add({
+      targets: [overlay, title, body],
+      alpha: { from: 0, to: 1 },
+      duration: 550,
+      ease: 'Sine.easeOut',
+    });
+
+    this.input.keyboard?.once('keydown-ENTER', () => {
+      this.sound.play(UI_CONFIRM_SFX_KEY, { volume: 0.45 });
+      this.scene.start('Menu');
+    });
   }
 }
