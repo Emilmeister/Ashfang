@@ -3,13 +3,16 @@ import Phaser from 'phaser';
 const PLAYER_SPEED = 240;
 const MAP_WIDTH = 2200;
 const MAP_HEIGHT = 1400;
-const PLAYER_TEXTURE_KEY = 'player-rect';
-const ENEMY_TEXTURE_KEY = 'enemy-rect';
+const PLAYER_TEXTURE_KEY = 'player-wolf';
+const ENEMY_TEXTURE_KEY = 'enemy-fiend';
 const ATTACK_COOLDOWN_MS = 450;
 const ATTACK_DAMAGE = 25;
 const ENEMY_MAX_HP = 100;
 const ATTACK_RANGE = 72;
 const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(42);
+
+const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
+const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
 
 type EnemyState = {
   sprite: Phaser.Physics.Arcade.Sprite;
@@ -47,9 +50,10 @@ export class LevelScene extends Phaser.Scene {
   create(): void {
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    this.cameras.main.setBackgroundColor(0x1a1a1a);
-
-    this.add.rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0x1a1a1a).setDepth(-10);
+    this.add
+      .tileSprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, BACKGROUND_TEXTURE_KEY)
+      .setTint(0x6f6f6f)
+      .setDepth(-10);
 
     this.add
       .text(24, 24, 'WASD / стрелки — движение\nПРОБЕЛ — атака\nESC — в меню', {
@@ -82,30 +86,26 @@ export class LevelScene extends Phaser.Scene {
 
     const obstacles = this.physics.add.staticGroup();
 
-    const obstacleData: Array<{ x: number; y: number; width: number; height: number; color: number }> = [
-      { x: 460, y: 300, width: 780, height: 70, color: 0x3b3b55 },
-      { x: 1220, y: 560, width: 420, height: 70, color: 0x3b3b55 },
-      { x: 920, y: 900, width: 840, height: 80, color: 0x3b3b55 },
-      { x: 1700, y: 360, width: 560, height: 70, color: 0x3b3b55 },
-      { x: 1840, y: 1120, width: 480, height: 70, color: 0x3b3b55 },
+    const obstacleData: Array<{ x: number; y: number; width: number; height: number }> = [
+      { x: 460, y: 300, width: 780, height: 70 },
+      { x: 1220, y: 560, width: 420, height: 70 },
+      { x: 920, y: 900, width: 840, height: 80 },
+      { x: 1700, y: 360, width: 560, height: 70 },
+      { x: 1840, y: 1120, width: 480, height: 70 },
     ];
 
     obstacleData.forEach((obstacle) => {
-      const platform = this.add.rectangle(
-        obstacle.x,
-        obstacle.y,
-        obstacle.width,
-        obstacle.height,
-        obstacle.color,
-      );
-      this.physics.add.existing(platform, true);
+      const platform = this.physics.add
+        .staticImage(obstacle.x, obstacle.y, OBSTACLE_TEXTURE_KEY)
+        .setDisplaySize(obstacle.width, obstacle.height)
+        .setTint(0x706060)
+        .refreshBody();
       obstacles.add(platform);
     });
 
-    this.createTextures();
-
     this.player = this.physics.add
       .sprite(100, 100, PLAYER_TEXTURE_KEY)
+      .setDisplaySize(48, 48)
       .setCollideWorldBounds(true)
       .setDrag(900, 900)
       .setMaxVelocity(PLAYER_SPEED, PLAYER_SPEED);
@@ -169,6 +169,7 @@ export class LevelScene extends Phaser.Scene {
     if (moveDirection.lengthSq() > 0) {
       moveDirection.normalize();
       this.playerFacing.copy(moveDirection);
+      this.player.setFlipX(moveDirection.x < 0);
     }
 
     const velocity = moveDirection.clone().scale(PLAYER_SPEED);
@@ -185,24 +186,6 @@ export class LevelScene extends Phaser.Scene {
     this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
   }
 
-  private createTextures(): void {
-    if (!this.textures.exists(PLAYER_TEXTURE_KEY)) {
-      const g = this.add.graphics({ x: 0, y: 0 });
-      g.fillStyle(0x50fa7b, 1);
-      g.fillRect(0, 0, 40, 40);
-      g.generateTexture(PLAYER_TEXTURE_KEY, 40, 40);
-      g.destroy();
-    }
-
-    if (!this.textures.exists(ENEMY_TEXTURE_KEY)) {
-      const g = this.add.graphics({ x: 0, y: 0 });
-      g.fillStyle(0xff5555, 1);
-      g.fillRect(0, 0, 40, 40);
-      g.generateTexture(ENEMY_TEXTURE_KEY, 40, 40);
-      g.destroy();
-    }
-  }
-
   private spawnEnemies(obstacles: Phaser.Physics.Arcade.StaticGroup): void {
     const enemySpawnPoints: Array<{ x: number; y: number }> = [
       { x: 340, y: 120 },
@@ -215,6 +198,7 @@ export class LevelScene extends Phaser.Scene {
     enemySpawnPoints.forEach((spawnPoint, index) => {
       const enemy = this.physics.add
         .sprite(spawnPoint.x, spawnPoint.y, ENEMY_TEXTURE_KEY)
+        .setDisplaySize(44, 44)
         .setImmovable(true)
         .setCollideWorldBounds(true)
         .setPushable(false);
