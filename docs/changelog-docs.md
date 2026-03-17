@@ -27,3 +27,4 @@
 - Добавлен план улучшения пользовательского опыта для Linear issue `DEV-28` в формате «Что есть сейчас -> что должно быть в хорошем продукте» (`docs/project-management/dev-28-ux-improvement-plan.md`).
 - Обновлена карта документации: добавлена ссылка на план UX-улучшений DEV-28.
 - Добавлен документ по задаче `DEV-30` с целевым состоянием movement/attack и критериями проверки (`docs/project-management/dev-30-base-gameplay-enhancement.md`).
+- Добавлен документ аудита кода и поэтапного рефакторинга по задаче `DEV-41` (`docs/project-management/dev-41-code-audit-refactoring.md`).

@@ -32,6 +32,32 @@ const PLAYER_HIT_SFX_KEY = 'sfx-player-hit';
 const ENEMY_DOWN_SFX_KEY = 'sfx-enemy-down';
 const UI_CONFIRM_SFX_KEY = 'sfx-ui-confirm';
 
+const OBSTACLE_DATA: Array<{ x: number; y: number; width: number; height: number }> = [
+  { x: 460, y: 300, width: 720, height: 70 },
+  { x: 1220, y: 560, width: 420, height: 70 },
+  { x: 920, y: 900, width: 820, height: 80 },
+  { x: 1700, y: 360, width: 560, height: 70 },
+  { x: 1840, y: 1120, width: 480, height: 70 },
+  { x: 1460, y: 1060, width: 380, height: 60 },
+];
+
+const ENEMY_SPAWN_POINTS: Array<{ x: number; y: number; speed: number; damage: number }> = [
+  { x: 340, y: 160, speed: 92, damage: 10 },
+  { x: 690, y: 250, speed: 106, damage: 10 },
+  { x: 1040, y: 210, speed: 115, damage: 11 },
+  { x: 1380, y: 520, speed: 118, damage: 12 },
+  { x: 1620, y: 790, speed: 126, damage: 12 },
+  { x: 1860, y: 930, speed: 130, damage: 13 },
+];
+
+const ONBOARDING_HINTS = [
+  'Обучение: Двигайся WASD / стрелками. Управление не блокируется.',
+  'Обучение: Нажми SPACE для атаки в сторону движения.',
+  'Обучение: SHIFT — короткий рывок с кулдауном для уклонения и входа в бой.',
+  'Обучение: Победи всех врагов и войди в сияющий портал.',
+  'Обучение: Портал открыт! Доберись до него, чтобы начать бой с боссом.',
+];
+
 type EnemyState = {
   sprite: Phaser.Physics.Arcade.Sprite;
   hp: number;
@@ -210,16 +236,7 @@ export class LevelScene extends Phaser.Scene {
 
     const obstacles = this.physics.add.staticGroup();
     this.obstacleGroup = obstacles;
-    const obstacleData: Array<{ x: number; y: number; width: number; height: number }> = [
-      { x: 460, y: 300, width: 720, height: 70 },
-      { x: 1220, y: 560, width: 420, height: 70 },
-      { x: 920, y: 900, width: 820, height: 80 },
-      { x: 1700, y: 360, width: 560, height: 70 },
-      { x: 1840, y: 1120, width: 480, height: 70 },
-      { x: 1460, y: 1060, width: 380, height: 60 },
-    ];
-
-    obstacleData.forEach((obstacle) => {
+    OBSTACLE_DATA.forEach((obstacle) => {
       const platform = this.physics.add
         .staticImage(obstacle.x, obstacle.y, OBSTACLE_TEXTURE_KEY)
         .setDisplaySize(obstacle.width, obstacle.height)
@@ -354,34 +371,8 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private spawnEnemies(obstacles: Phaser.Physics.Arcade.StaticGroup): void {
-    const enemySpawnPoints: Array<{ x: number; y: number; speed: number; damage: number }> = [
-      { x: 340, y: 160, speed: 92, damage: 10 },
-      { x: 690, y: 250, speed: 106, damage: 10 },
-      { x: 1040, y: 210, speed: 115, damage: 11 },
-      { x: 1380, y: 520, speed: 118, damage: 12 },
-      { x: 1620, y: 790, speed: 126, damage: 12 },
-      { x: 1860, y: 930, speed: 130, damage: 13 },
-    ];
-
-    enemySpawnPoints.forEach((spawnPoint) => {
-      const enemy = this.physics.add
-        .sprite(spawnPoint.x, spawnPoint.y, ENEMY_TEXTURE_KEY)
-        .setDisplaySize(44, 44)
-        .setCollideWorldBounds(true);
-
-      const enemyState: EnemyState = {
-        sprite: enemy,
-        hp: ENEMY_MAX_HP,
-        speed: spawnPoint.speed,
-        damage: spawnPoint.damage,
-        lastHitTime: -Infinity,
-        staggerUntil: -Infinity,
-      };
-
-      this.enemies.push(enemyState);
-
-      this.physics.add.collider(enemy, obstacles);
-      this.physics.add.collider(this.player, enemy, () => this.onEnemyTouchPlayer(enemyState));
+    ENEMY_SPAWN_POINTS.forEach((spawnPoint) => {
+      this.createEnemy(spawnPoint.x, spawnPoint.y, spawnPoint.speed, spawnPoint.damage, obstacles);
     });
   }
 
@@ -393,29 +384,45 @@ export class LevelScene extends Phaser.Scene {
     const spawnOffset = new Phaser.Math.Vector2().setToPolar(Phaser.Math.FloatBetween(0, Math.PI * 2), 220);
     const spawnX = Phaser.Math.Clamp(this.player.x + spawnOffset.x, 40, MAP_WIDTH - 40);
     const spawnY = Phaser.Math.Clamp(this.player.y + spawnOffset.y, 40, MAP_HEIGHT - 40);
+    this.createEnemy(spawnX, spawnY, 140, 14, this.obstacleGroup, 0xff9f43);
+
+    this.pressureSpawnCount += 1;
+    this.dialogueText.setText('Скверна чувствует паузу — новая тварь выходит на охоту!');
+  }
+
+  private createEnemy(
+    x: number,
+    y: number,
+    speed: number,
+    damage: number,
+    obstacles?: Phaser.Physics.Arcade.StaticGroup,
+    tint?: number,
+  ): void {
     const enemy = this.physics.add
-      .sprite(spawnX, spawnY, ENEMY_TEXTURE_KEY)
+      .sprite(x, y, ENEMY_TEXTURE_KEY)
       .setDisplaySize(44, 44)
-      .setCollideWorldBounds(true)
-      .setTint(0xff9f43);
+      .setCollideWorldBounds(true);
+
+    if (typeof tint === 'number') {
+      enemy.setTint(tint);
+    }
 
     const enemyState: EnemyState = {
       sprite: enemy,
       hp: ENEMY_MAX_HP,
-      speed: 140,
-      damage: 14,
+      speed,
+      damage,
       lastHitTime: -Infinity,
       staggerUntil: -Infinity,
     };
 
     this.enemies.push(enemyState);
-    if (this.obstacleGroup) {
-      this.physics.add.collider(enemy, this.obstacleGroup);
-    }
-    this.physics.add.collider(this.player, enemy, () => this.onEnemyTouchPlayer(enemyState));
 
-    this.pressureSpawnCount += 1;
-    this.dialogueText.setText('Скверна чувствует паузу — новая тварь выходит на охоту!');
+    if (obstacles) {
+      this.physics.add.collider(enemy, obstacles);
+    }
+
+    this.physics.add.collider(this.player, enemy, () => this.onEnemyTouchPlayer(enemyState));
   }
 
   private updateEnemies(time: number): void {
@@ -700,13 +707,7 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private completeLevel(): void {
-    this.isCompleting = true;
-    this.statusText.setText('Статус: Переход');
-    this.player.setVelocity(0, 0);
-    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
-    if (playerBody) {
-      playerBody.enable = false;
-    }
+    this.startEndState('Статус: Переход');
     this.sound.play(UI_CONFIRM_SFX_KEY, { volume: 0.4 });
     this.dialogueText.setText('Переход в следующую зону...');
 
@@ -716,13 +717,7 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private failLevel(): void {
-    this.isCompleting = true;
-    this.statusText.setText('Статус: Поражение');
-    this.player.setVelocity(0, 0);
-    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
-    if (playerBody) {
-      playerBody.enable = false;
-    }
+    this.startEndState('Статус: Поражение');
     this.dialogueText.setText('Ashfang пал. Нажми R, чтобы начать заново.');
 
     this.input.keyboard?.once('keydown-R', () => this.scene.restart());
@@ -739,15 +734,7 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private scheduleOnboardingHints(): void {
-    const hints = [
-      'Обучение: Двигайся WASD / стрелками. Управление не блокируется.',
-      'Обучение: Нажми SPACE для атаки в сторону движения.',
-      'Обучение: SHIFT — короткий рывок с кулдауном для уклонения и входа в бой.',
-      'Обучение: Победи всех врагов и войди в сияющий портал.',
-      'Обучение: Портал открыт! Доберись до него, чтобы начать бой с боссом.',
-    ];
-
-    this.showOnboarding(hints[0]);
+    this.showOnboarding(ONBOARDING_HINTS[0]);
 
     this.time.delayedCall(7000, () => {
       if (!this.hasMoved) {
@@ -769,14 +756,26 @@ export class LevelScene extends Phaser.Scene {
 
     this.onboardingStepIndex = stepIndex;
 
-    if (stepIndex === 1) {
-      this.showOnboarding('Отлично! Теперь попробуй атаку: SPACE.');
-    } else if (stepIndex === 2) {
-      this.showOnboarding('Теперь протестируй рывок: SHIFT, затем добей врагов.');
-    } else if (stepIndex === 3) {
-      this.showOnboarding('Хорошо! Добей врагов и открой путь к порталу.');
-    } else if (stepIndex === 4) {
-      this.showOnboarding('Финал этапа: войди в портал, чтобы встретить источник скверны.');
+    const hintsByStep: Record<number, string> = {
+      1: 'Отлично! Теперь попробуй атаку: SPACE.',
+      2: 'Теперь протестируй рывок: SHIFT, затем добей врагов.',
+      3: 'Хорошо! Добей врагов и открой путь к порталу.',
+      4: 'Финал этапа: войди в портал, чтобы встретить источник скверны.',
+    };
+
+    const nextHint = hintsByStep[stepIndex];
+    if (nextHint) {
+      this.showOnboarding(nextHint);
+    }
+  }
+
+  private startEndState(statusText: string): void {
+    this.isCompleting = true;
+    this.statusText.setText(statusText);
+    this.player.setVelocity(0, 0);
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (playerBody) {
+      playerBody.enable = false;
     }
   }
 

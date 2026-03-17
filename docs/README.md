@@ -11,6 +11,7 @@
 - [План улучшения UX для MVP (DEV-28)](./project-management/dev-28-ux-improvement-plan.md)
 - [Документ по core loop и корневой проблеме (DEV-29)](./project-management/dev-29-core-loop-root-problem.md)
 - [План усиления базового gameplay (DEV-30)](./project-management/dev-30-base-gameplay-enhancement.md)
+- [Аудит кода и план рефакторинга (DEV-41)](./project-management/dev-41-code-audit-refactoring.md)
 - [Концепция игры Ashfang](./game-design/game-concept.md)
 - [Пак ассетов MVP](./game-design/mvp-asset-pack.md)
 
