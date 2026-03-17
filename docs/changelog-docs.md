@@ -32,3 +32,5 @@
 - Обновлена карта документации: добавлена ссылка на план UX-улучшений DEV-28.
 - Добавлен документ по задаче `DEV-30` с целевым состоянием movement/attack и критериями проверки (`docs/project-management/dev-30-base-gameplay-enhancement.md`).
 - Добавлен документ аудита кода и поэтапного рефакторинга по задаче `DEV-41` (`docs/project-management/dev-41-code-audit-refactoring.md`).
+- Добавлен документ по задаче `DEV-42` с аудитом тестового покрытия и планом проверок в CI/CD (`docs/project-management/dev-42-test-coverage-audit.md`).
+

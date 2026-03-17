@@ -14,6 +14,7 @@
 - [План усиления базового gameplay (DEV-30)](./project-management/dev-30-base-gameplay-enhancement.md)
 - [Аудит кода и план рефакторинга (DEV-41)](./project-management/dev-41-code-audit-refactoring.md)
 - [Аудит больших файлов и распил сцен (DEV-43)](./project-management/dev-43-large-files-audit.md)
+- [Аудит покрытия кода тестами (DEV-42)](./project-management/dev-42-test-coverage-audit.md)
 - [Концепция игры Ashfang](./game-design/game-concept.md)
 - [Пак ассетов MVP](./game-design/mvp-asset-pack.md)
 
