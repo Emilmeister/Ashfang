@@ -5,11 +5,13 @@ const MAP_WIDTH = 2200;
 const MAP_HEIGHT = 1400;
 const PLAYER_TEXTURE_KEY = 'player-wolf';
 const ENEMY_TEXTURE_KEY = 'enemy-fiend';
-const ATTACK_COOLDOWN_MS = 450;
+const ATTACK_COOLDOWN_MS = 430;
 const ATTACK_DAMAGE = 25;
-const ENEMY_MAX_HP = 100;
-const ATTACK_RANGE = 72;
-const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(42);
+const ENEMY_MAX_HP = 70;
+const ATTACK_RANGE = 78;
+const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(46);
+const PLAYER_MAX_HP = 140;
+const PLAYER_HIT_COOLDOWN_MS = 650;
 
 const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
 const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
@@ -17,6 +19,9 @@ const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
 type EnemyState = {
   sprite: Phaser.Physics.Arcade.Sprite;
   hp: number;
+  speed: number;
+  damage: number;
+  lastHitTime: number;
 };
 
 export class LevelScene extends Phaser.Scene {
@@ -26,9 +31,11 @@ export class LevelScene extends Phaser.Scene {
 
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
 
-  private fpsText!: Phaser.GameObjects.Text;
+  private hudText!: Phaser.GameObjects.Text;
 
-  private combatText!: Phaser.GameObjects.Text;
+  private dialogueText!: Phaser.GameObjects.Text;
+
+  private objectiveText!: Phaser.GameObjects.Text;
 
   private wasdKeys?: {
     up: Phaser.Input.Keyboard.Key;
@@ -43,6 +50,14 @@ export class LevelScene extends Phaser.Scene {
 
   private playerFacing = new Phaser.Math.Vector2(1, 0);
 
+  private playerHp = PLAYER_MAX_HP;
+
+  private portalUnlocked = false;
+
+  private portalZone?: Phaser.GameObjects.Zone;
+
+  private isCompleting = false;
+
   constructor() {
     super('Level');
   }
@@ -52,53 +67,87 @@ export class LevelScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.add
       .tileSprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, BACKGROUND_TEXTURE_KEY)
-      .setTint(0x6f6f6f)
+      .setTint(0x676767)
       .setDepth(-10);
 
     this.add
-      .text(24, 24, 'WASD / стрелки — движение\nПРОБЕЛ — атака\nESC — в меню', {
-        fontFamily: 'Arial',
-        fontSize: '24px',
-        color: '#f5f5f5',
-      })
-      .setScrollFactor(0)
-      .setDepth(10);
+      .rectangle(110, 110, 180, 180, 0x4caf50, 0.15)
+      .setStrokeStyle(4, 0x7bed9f, 0.75)
+      .setDepth(-1);
 
-    this.fpsText = this.add
-      .text(this.scale.width - 24, 24, 'FPS: --', {
-        fontFamily: 'Arial',
-        fontSize: '22px',
-        color: '#8be9fd',
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0)
-      .setDepth(10);
-
-    this.combatText = this.add
-      .text(24, this.scale.height - 24, this.getCombatHudText(), {
+    this.add
+      .text(30, 32, 'Старт: Руины Пепла', {
         fontFamily: 'Arial',
         fontSize: '20px',
-        color: '#ffb86c',
+        color: '#d7ffd6',
       })
-      .setOrigin(0, 1)
+      .setDepth(1);
+
+    const portalFrame = this.add
+      .rectangle(MAP_WIDTH - 165, MAP_HEIGHT - 165, 220, 220, 0x00a8ff, 0.08)
+      .setStrokeStyle(5, 0x7ed6ff, 0.25)
+      .setDepth(-1);
+
+    this.tweens.add({
+      targets: portalFrame,
+      alpha: 0.4,
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.portalZone = this.add.zone(MAP_WIDTH - 165, MAP_HEIGHT - 165, 180, 180);
+    this.physics.world.enable(this.portalZone);
+    const portalBody = this.portalZone.body as Phaser.Physics.Arcade.Body;
+    portalBody.setAllowGravity(false);
+    portalBody.setImmovable(true);
+
+    this.hudText = this.add
+      .text(22, 20, '', {
+        fontFamily: 'Arial',
+        fontSize: '20px',
+        color: '#f1f5f9',
+      })
       .setScrollFactor(0)
-      .setDepth(10);
+      .setDepth(20);
+
+    this.objectiveText = this.add
+      .text(22, 48, 'Цель: Очисти руины и дойди до портала', {
+        fontFamily: 'Arial',
+        fontSize: '20px',
+        color: '#facc15',
+      })
+      .setScrollFactor(0)
+      .setDepth(20);
+
+    this.dialogueText = this.add
+      .text(this.scale.width / 2, this.scale.height - 70, '', {
+        fontFamily: 'Arial',
+        fontSize: '22px',
+        color: '#ffe8a3',
+        align: 'center',
+        wordWrap: { width: Math.min(this.scale.width - 80, 900) },
+      })
+      .setOrigin(0.5, 1)
+      .setScrollFactor(0)
+      .setDepth(20);
 
     const obstacles = this.physics.add.staticGroup();
-
     const obstacleData: Array<{ x: number; y: number; width: number; height: number }> = [
-      { x: 460, y: 300, width: 780, height: 70 },
+      { x: 460, y: 300, width: 720, height: 70 },
       { x: 1220, y: 560, width: 420, height: 70 },
-      { x: 920, y: 900, width: 840, height: 80 },
+      { x: 920, y: 900, width: 820, height: 80 },
       { x: 1700, y: 360, width: 560, height: 70 },
       { x: 1840, y: 1120, width: 480, height: 70 },
+      { x: 1460, y: 1060, width: 380, height: 60 },
     ];
 
     obstacleData.forEach((obstacle) => {
       const platform = this.physics.add
         .staticImage(obstacle.x, obstacle.y, OBSTACLE_TEXTURE_KEY)
         .setDisplaySize(obstacle.width, obstacle.height)
-        .setTint(0x706060)
+        .setTint(0x625555)
         .refreshBody();
       obstacles.add(platform);
     });
@@ -112,12 +161,16 @@ export class LevelScene extends Phaser.Scene {
 
     this.physics.add.collider(this.player, obstacles);
     this.spawnEnemies(obstacles);
-    this.combatText.setText(this.getCombatHudText());
+
+    this.physics.add.overlap(this.player, this.portalZone, () => {
+      if (this.portalUnlocked && !this.isCompleting) {
+        this.completeLevel();
+      }
+    });
 
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
 
     const keyboard = this.input.keyboard;
-
     this.cursors = keyboard?.createCursorKeys();
 
     if (keyboard) {
@@ -134,20 +187,20 @@ export class LevelScene extends Phaser.Scene {
       };
 
       this.attackKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
-      keyboard.once('keydown-ESC', () => {
-        this.scene.start('Menu');
-      });
+      keyboard.once('keydown-ESC', () => this.scene.start('Menu'));
     }
 
     this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
-      this.fpsText.setPosition(gameSize.width - 24, 24);
-      this.combatText.setPosition(24, gameSize.height - 24);
+      this.dialogueText.setPosition(gameSize.width / 2, gameSize.height - 70);
+      this.dialogueText.setWordWrapWidth(Math.min(gameSize.width - 80, 900));
     });
+
+    this.playIntroDialogue();
+    this.updateHud();
   }
 
   update(time: number): void {
-    if (!this.player?.body) {
+    if (!this.player?.body || this.isCompleting) {
       return;
     }
 
@@ -183,40 +236,92 @@ export class LevelScene extends Phaser.Scene {
       this.performAttack(time);
     }
 
-    this.fpsText.setText(`FPS: ${Math.round(this.game.loop.actualFps)}`);
+    this.updateEnemies(time);
+
+    if (!this.portalUnlocked && this.getAliveEnemies().length === 0) {
+      this.unlockPortal();
+    }
   }
 
   private spawnEnemies(obstacles: Phaser.Physics.Arcade.StaticGroup): void {
-    const enemySpawnPoints: Array<{ x: number; y: number }> = [
-      { x: 340, y: 120 },
-      { x: 560, y: 180 },
-      { x: 760, y: 140 },
-      { x: 980, y: 220 },
-      { x: 1200, y: 180 },
+    const enemySpawnPoints: Array<{ x: number; y: number; speed: number; damage: number }> = [
+      { x: 340, y: 160, speed: 92, damage: 10 },
+      { x: 690, y: 250, speed: 106, damage: 10 },
+      { x: 1040, y: 210, speed: 115, damage: 11 },
+      { x: 1380, y: 520, speed: 118, damage: 12 },
+      { x: 1620, y: 790, speed: 126, damage: 12 },
+      { x: 1860, y: 930, speed: 130, damage: 13 },
     ];
 
-    enemySpawnPoints.forEach((spawnPoint, index) => {
+    enemySpawnPoints.forEach((spawnPoint) => {
       const enemy = this.physics.add
         .sprite(spawnPoint.x, spawnPoint.y, ENEMY_TEXTURE_KEY)
         .setDisplaySize(44, 44)
-        .setImmovable(true)
-        .setCollideWorldBounds(true)
-        .setPushable(false);
+        .setCollideWorldBounds(true);
 
-      this.enemies.push({ sprite: enemy, hp: ENEMY_MAX_HP });
+      const enemyState: EnemyState = {
+        sprite: enemy,
+        hp: ENEMY_MAX_HP,
+        speed: spawnPoint.speed,
+        damage: spawnPoint.damage,
+        lastHitTime: -Infinity,
+      };
+
+      this.enemies.push(enemyState);
 
       this.physics.add.collider(enemy, obstacles);
-      this.physics.add.collider(this.player, enemy);
-
-      this.tweens.add({
-        targets: enemy,
-        y: enemy.y - 8,
-        yoyo: true,
-        repeat: -1,
-        duration: 420 + index * 70,
-        ease: 'Sine.easeInOut',
-      });
+      this.physics.add.collider(this.player, enemy, () => this.onEnemyTouchPlayer(enemyState));
     });
+  }
+
+  private updateEnemies(time: number): void {
+    this.getAliveEnemies().forEach((enemyState) => {
+      const direction = new Phaser.Math.Vector2(this.player.x - enemyState.sprite.x, this.player.y - enemyState.sprite.y);
+      const distance = direction.length();
+
+      if (distance < 2) {
+        enemyState.sprite.setVelocity(0, 0);
+        return;
+      }
+
+      direction.normalize();
+      enemyState.sprite.setVelocity(direction.x * enemyState.speed, direction.y * enemyState.speed);
+      enemyState.sprite.setFlipX(direction.x < 0);
+
+      if (distance <= 64 && time - enemyState.lastHitTime >= PLAYER_HIT_COOLDOWN_MS) {
+        this.onEnemyTouchPlayer(enemyState);
+      }
+    });
+  }
+
+  private onEnemyTouchPlayer(enemyState: EnemyState): void {
+    if (!enemyState.sprite.active || this.isCompleting) {
+      return;
+    }
+
+    const now = this.time.now;
+
+    if (now - enemyState.lastHitTime < PLAYER_HIT_COOLDOWN_MS) {
+      return;
+    }
+
+    enemyState.lastHitTime = now;
+    this.playerHp = Math.max(0, this.playerHp - enemyState.damage);
+    this.player.setTintFill(0xff6b6b);
+
+    this.time.delayedCall(120, () => {
+      if (this.player.active) {
+        this.player.clearTint();
+      }
+    });
+
+    this.cameras.main.shake(90, 0.0035);
+    this.dialogueText.setText(`Тварь ранит Ashfang! -${enemyState.damage} HP`);
+    this.updateHud();
+
+    if (this.playerHp <= 0) {
+      this.failLevel();
+    }
   }
 
   private performAttack(time: number): void {
@@ -226,13 +331,12 @@ export class LevelScene extends Phaser.Scene {
     const hitEnemies = this.enemies.filter((enemyState) => this.isEnemyHit(enemyState));
 
     if (hitEnemies.length === 0) {
-      this.combatText.setText(`Промах. КД ${this.getCooldownText(this.lastAttackTime)} сек`);
+      this.dialogueText.setText('Удар впустую. Враги наступают!');
       return;
     }
 
     hitEnemies.forEach((enemyState) => {
       enemyState.hp = Math.max(0, enemyState.hp - ATTACK_DAMAGE);
-
       enemyState.sprite.setTintFill(0xffffff);
       this.time.delayedCall(90, () => {
         if (enemyState.sprite.active) {
@@ -246,15 +350,9 @@ export class LevelScene extends Phaser.Scene {
     });
 
     this.cameras.main.shake(90, 0.002);
-
-    const aliveEnemies = this.enemies.filter((enemyState) => enemyState.hp > 0).length;
-
-    if (aliveEnemies === 0) {
-      this.combatText.setText('Комбо! Все враги побеждены.');
-      return;
-    }
-
-    this.combatText.setText(`Попадание x${hitEnemies.length}! Осталось врагов: ${aliveEnemies}. КД ${this.getCooldownText(this.lastAttackTime)} сек`);
+    const aliveEnemies = this.getAliveEnemies().length;
+    this.dialogueText.setText(`Попадание x${hitEnemies.length}. Осталось врагов: ${aliveEnemies}`);
+    this.updateHud();
   }
 
   private playAttackAnimation(): void {
@@ -294,10 +392,7 @@ export class LevelScene extends Phaser.Scene {
       return false;
     }
 
-    const toEnemy = new Phaser.Math.Vector2(
-      enemyState.sprite.x - this.player.x,
-      enemyState.sprite.y - this.player.y,
-    );
+    const toEnemy = new Phaser.Math.Vector2(enemyState.sprite.x - this.player.x, enemyState.sprite.y - this.player.y);
     const enemyDistance = toEnemy.length();
 
     if (enemyDistance === 0 || enemyDistance > ATTACK_RANGE) {
@@ -310,14 +405,54 @@ export class LevelScene extends Phaser.Scene {
     return Math.abs(facingAngle) <= ATTACK_ARC_HALF_ANGLE;
   }
 
-  private getCombatHudText(): string {
-    return `Врагов: ${this.enemies.length} | Урон: ${ATTACK_DAMAGE} | КД: ${(ATTACK_COOLDOWN_MS / 1000).toFixed(2)} сек`;
+  private updateHud(): void {
+    this.hudText.setText(`HP: ${this.playerHp}/${PLAYER_MAX_HP} | Враги: ${this.getAliveEnemies().length} | FPS: ${Math.round(this.game.loop.actualFps)}`);
   }
 
-  private getCooldownText(lastAttackTime: number): string {
-    const availableAt = lastAttackTime + ATTACK_COOLDOWN_MS;
-    const remainingMs = Math.max(0, availableAt - this.time.now);
-    return (remainingMs / 1000).toFixed(2);
+  private getAliveEnemies(): EnemyState[] {
+    return this.enemies.filter((enemyState) => enemyState.hp > 0 && enemyState.sprite.active);
+  }
+
+  private unlockPortal(): void {
+    this.portalUnlocked = true;
+    this.objectiveText.setText('Цель: Войди в портал, чтобы добраться до Сердца руин');
+    this.dialogueText.setText('Ashfang: Путь открыт. Источник скверны рядом.');
+  }
+
+  private completeLevel(): void {
+    this.isCompleting = true;
+    this.player.setVelocity(0, 0);
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (playerBody) {
+      playerBody.enable = false;
+    }
+    this.dialogueText.setText('Переход в следующую зону...');
+
+    this.time.delayedCall(1000, () => {
+      this.scene.start('Boss', { playerHp: this.playerHp });
+    });
+  }
+
+  private failLevel(): void {
+    this.isCompleting = true;
+    this.player.setVelocity(0, 0);
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
+    if (playerBody) {
+      playerBody.enable = false;
+    }
+    this.dialogueText.setText('Ashfang пал. Нажми R, чтобы начать заново.');
+
+    this.input.keyboard?.once('keydown-R', () => this.scene.restart());
+  }
+
+  private playIntroDialogue(): void {
+    this.dialogueText.setText('Старейшина: Ashfang, в руинах пробудилась дикая скверна.');
+    this.time.delayedCall(3200, () => {
+      this.dialogueText.setText('Ashfang: Я очищу путь и доберусь до Сердца руин.');
+    });
+    this.time.delayedCall(6500, () => {
+      this.dialogueText.setText('Убей всех врагов. После этого активируется портал к боссу.');
+    });
   }
 
   private getFacingAngle(): number {
