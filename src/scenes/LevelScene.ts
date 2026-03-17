@@ -8,9 +8,9 @@ const ENEMY_TEXTURE_KEY = 'enemy-fiend';
 const ATTACK_COOLDOWN_MS = 430;
 const ATTACK_DAMAGE = 25;
 const ENEMY_MAX_HP = 70;
-const ATTACK_RANGE = 78;
+const ATTACK_RANGE = 102;
 const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(46);
-const PLAYER_MAX_HP = 140;
+const PLAYER_MAX_HP = 180;
 const PLAYER_HIT_COOLDOWN_MS = 650;
 
 const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
@@ -382,19 +382,21 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private playAttackAnimation(): void {
+    const baseScaleX = this.player.scaleX;
+    const baseScaleY = this.player.scaleY;
+
     this.player.setTintFill(0xf1fa8c);
-    this.player.setScale(1, 1);
 
     this.tweens.add({
       targets: this.player,
-      scaleX: 1.22,
-      scaleY: 0.86,
+      scaleX: baseScaleX * 1.22,
+      scaleY: baseScaleY * 0.86,
       yoyo: true,
       duration: 85,
       ease: 'Quad.easeOut',
       onComplete: () => {
         this.player.clearTint();
-        this.player.setScale(1, 1);
+        this.player.setScale(baseScaleX, baseScaleY);
       },
     });
 
