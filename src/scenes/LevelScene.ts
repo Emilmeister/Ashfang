@@ -20,6 +20,7 @@ export class LevelScene extends Phaser.Scene {
   private wasdKeys?: WasdKeys;
   private attackKey?: Phaser.Input.Keyboard.Key;
   private dashKey?: Phaser.Input.Keyboard.Key;
+  private spiritStrikeKey?: Phaser.Input.Keyboard.Key;
   private playerFacing = new Phaser.Math.Vector2(1, 0);
   private movementVelocity = new Phaser.Math.Vector2();
   private dashDirection = new Phaser.Math.Vector2(1, 0);
@@ -96,6 +97,9 @@ export class LevelScene extends Phaser.Scene {
     }
     if (this.dashKey && Phaser.Input.Keyboard.JustDown(this.dashKey)) {
       this.combat.tryDash(time, moveDirection);
+    }
+    if (this.spiritStrikeKey && Phaser.Input.Keyboard.JustDown(this.spiritStrikeKey)) {
+      this.combat.trySpiritStrike();
     }
     this.combat.updateEnemies(time);
     this.combat.maybeTriggerDowntimeEvent(time, this.portalUnlocked);
@@ -197,6 +201,7 @@ export class LevelScene extends Phaser.Scene {
     }) as WasdKeys;
     this.attackKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.spiritStrikeKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     keyboard.on('keydown-ESC', () => this.togglePause());
   }
   private getMoveDirection(): Phaser.Math.Vector2 {
@@ -247,6 +252,8 @@ export class LevelScene extends Phaser.Scene {
       firstCombatTimeMs: this.firstCombatTimeMs,
       levelStartTime: this.levelStartTime,
       lastDashTime: this.combat.getLastDashTime(),
+      spiritEnergy: this.combat.getSpiritEnergy(),
+      strategyHint: this.combat.getStrategyHint(),
     });
   }
   private unlockPortal(): void {

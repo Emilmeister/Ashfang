@@ -24,6 +24,21 @@ export const DASH_DURATION_MS = 130;
 export const DASH_COOLDOWN_MS = 1400;
 export const ENEMY_STAGGER_MS = 210;
 export const ENEMY_HIT_KNOCKBACK = 280;
+export const RISKY_MELEE_RANGE = 58;
+export const RISKY_DAMAGE_MULTIPLIER = 1.55;
+export const SPIRIT_STRIKE_DAMAGE = 30;
+export const SPIRIT_STRIKE_RANGE = 300;
+export const SPIRIT_STRIKE_COST = 40;
+export const SPIRIT_ENERGY_MAX = 100;
+export const SPIRIT_PASSIVE_REGEN_PER_SEC = 8;
+export const SPIRIT_RISK_REGEN_PER_SEC = 22;
+
+export const ENEMY_HIT_BARKS = [
+  'Скверна шипит: "Р-рра!"',
+  'Тварь рычит: "Не-еет!"',
+  'Враг воет: "Пепел... жжёт!"',
+  'Скверна скалится: "Ты заплатишь!"',
+];
 
 export const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
 export const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
@@ -55,6 +70,7 @@ export const ONBOARDING_HINTS = [
   'Обучение: Двигайся WASD / стрелками. Управление не блокируется.',
   'Обучение: Нажми SPACE для атаки в сторону движения.',
   'Обучение: SHIFT — короткий рывок с кулдауном для уклонения и входа в бой.',
+  'Обучение: Q — безопасный дальний удар за энергию духа. Ближний бой даёт бонус энергии.',
   'Обучение: Победи всех врагов и войди в сияющий портал.',
   'Обучение: Портал открыт! Доберись до него, чтобы начать бой с боссом.',
 ];

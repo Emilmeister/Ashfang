@@ -68,12 +68,14 @@ describe('LevelUiController', () => {
       firstCombatTimeMs: 1800,
       levelStartTime: 2_000,
       lastDashTime: 9_700,
+      spiritEnergy: 66,
+      strategyHint: 'Безопасно: Q (дальний удар)',
     });
 
     expect(ui.hudText.setText).toHaveBeenCalledWith(expect.stringContaining('HP: 120/180'));
     expect(ui.hudText.setText).toHaveBeenCalledWith(expect.stringContaining('Рывок: 1.1с'));
     expect(ui.objectiveText.setText).toHaveBeenCalledWith('Цель: Уничтожь врагов (4) и войди в портал');
-    expect(ui.statusText.setText).toHaveBeenCalledWith('Статус: В бою | TTF: 1.8с');
+    expect(ui.statusText.setText).toHaveBeenCalledWith('Статус: В бою | TTF: 1.8с | Безопасно: Q (дальний удар)');
   });
 
   it('advances onboarding and avoids duplicate hint replay', () => {
@@ -98,7 +100,7 @@ describe('LevelUiController', () => {
 
     callbacks.forEach((callback) => callback());
 
-    const renderedHints = ui.onboardingText.setText.mock.calls.map(([value]) => value);
+    const renderedHints = (ui.onboardingText.setText.mock.calls as [string][]).map(([value]) => value);
     expect(renderedHints).toContain('Обучение: Двигайся WASD / стрелками. Управление не блокируется.');
     expect(renderedHints).toContain('Подсказка: зажми W/A/S/D для рывка по руинам.');
     expect(renderedHints).toContain('Подсказка: атака проходит фазы startup → impact → recover. Лови момент impact.');
