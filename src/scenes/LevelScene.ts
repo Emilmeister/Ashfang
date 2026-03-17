@@ -9,11 +9,14 @@ import {
   PLAYER_HIT_SFX_KEY,
   PLAYER_MAX_HP,
   PLAYER_TEXTURE_KEY,
+  PROGRESSION_MODIFIERS,
+  SESSION_PROGRESS_OBJECTIVES,
   UI_CONFIRM_SFX_KEY,
 } from './level/constants';
 import { LevelCombatController } from './level/LevelCombatController';
+import { createLevelUiElements } from './level/LevelUiFactory';
 import { LevelUiController } from './level/LevelUiController';
-import type { WasdKeys } from './level/types';
+import type { ProgressionModifier, WasdKeys } from './level/types';
 export class LevelScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -30,6 +33,8 @@ export class LevelScene extends Phaser.Scene {
   private hasMoved = false;
   private hasAttacked = false;
   private portalUnlocked = false;
+  private sessionKills = 0;
+  private progressionStepIndex = 0;
   private isCompleting = false;
   private obstacleGroup?: Phaser.Physics.Arcade.StaticGroup;
   private portalZone?: Phaser.GameObjects.Zone;
@@ -53,7 +58,7 @@ export class LevelScene extends Phaser.Scene {
       dashDirection: this.dashDirection,
       obstacleGroup: this.obstacleGroup,
       onEnemyHitPlayer: (damage) => this.onEnemyHitPlayer(damage),
-      onEnemyDefeated: () => undefined,
+      onEnemyDefeated: () => this.onEnemyDefeated(),
       onAttackResult: (message, isCombat) => {
         this.ui.setDialogue(message);
         if (isCombat && this.firstCombatTimeMs === null) {
@@ -153,35 +158,7 @@ export class LevelScene extends Phaser.Scene {
     });
   }
   private createUi(): void {
-    const hudText = this.add.text(22, 20, '', { fontFamily: 'Arial', fontSize: '20px', color: '#f1f5f9' }).setScrollFactor(0).setDepth(20);
-    const objectiveText = this.add
-      .text(22, 48, 'Цель: Очисти руины и дойди до портала', { fontFamily: 'Arial', fontSize: '20px', color: '#facc15' })
-      .setScrollFactor(0)
-      .setDepth(20);
-    const statusText = this.add.text(22, 76, 'Статус: В бою | TTF: в процессе', { fontFamily: 'Arial', fontSize: '20px', color: '#7dd3fc' }).setScrollFactor(0).setDepth(20);
-    const onboardingText = this.add
-      .text(this.scale.width - 24, 22, '', {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        color: '#93c5fd',
-        align: 'right',
-        wordWrap: { width: Math.min(this.scale.width * 0.44, 460) },
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0)
-      .setDepth(22);
-    const dialogueText = this.add
-      .text(this.scale.width / 2, this.scale.height - 70, '', {
-        fontFamily: 'Arial',
-        fontSize: '22px',
-        color: '#ffe8a3',
-        align: 'center',
-        wordWrap: { width: Math.min(this.scale.width - 80, 900) },
-      })
-      .setOrigin(0.5, 1)
-      .setScrollFactor(0)
-      .setDepth(20);
-    this.ui = new LevelUiController(this, { hudText, objectiveText, statusText, onboardingText, dialogueText });
+    this.ui = new LevelUiController(this, createLevelUiElements(this));
     this.scale.on('resize', (gameSize: Phaser.Structs.Size) => this.ui.onResize(gameSize));
     this.events.on('resume', () => {
       if (!this.isCompleting) {
@@ -243,6 +220,29 @@ export class LevelScene extends Phaser.Scene {
     }
   }
 
+  private onEnemyDefeated(): void {
+    this.sessionKills += 1;
+    this.tryGrantProgressModifier();
+  }
+
+  private tryGrantProgressModifier(): void {
+    if (this.progressionStepIndex >= SESSION_PROGRESS_OBJECTIVES.length) {
+      return;
+    }
+
+    const targetKills = SESSION_PROGRESS_OBJECTIVES[this.progressionStepIndex];
+    if (this.sessionKills < targetKills) {
+      return;
+    }
+
+    const modifier = PROGRESSION_MODIFIERS[this.progressionStepIndex] as ProgressionModifier;
+    this.combat.addModifier(modifier.id);
+    this.progressionStepIndex += 1;
+
+    this.ui.setDialogue(`Прогрессия: ${modifier.title} — ${modifier.description}`);
+    this.ui.setObjective('Цель: Протестируй новый стиль боя и зачисти остатки скверны.');
+  }
+
   private updateHud(): void {
     this.ui.updateHud({
       playerHp: this.playerHp,
@@ -254,6 +254,9 @@ export class LevelScene extends Phaser.Scene {
       lastDashTime: this.combat.getLastDashTime(),
       spiritEnergy: this.combat.getSpiritEnergy(),
       strategyHint: this.combat.getStrategyHint(),
+      sessionKills: this.sessionKills,
+      progressionGoal: SESSION_PROGRESS_OBJECTIVES[this.progressionStepIndex] ?? null,
+      activeModifiers: this.combat.getActiveModifierIds().map((id) => PROGRESSION_MODIFIERS.find((modifier) => modifier.id === id)?.title ?? id),
     });
   }
   private unlockPortal(): void {

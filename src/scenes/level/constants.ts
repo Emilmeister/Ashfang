@@ -33,6 +33,11 @@ export const SPIRIT_ENERGY_MAX = 100;
 export const SPIRIT_PASSIVE_REGEN_PER_SEC = 8;
 export const SPIRIT_RISK_REGEN_PER_SEC = 22;
 
+export const SESSION_PROGRESS_OBJECTIVES = [2, 4] as const;
+export const ECHO_WAVE_RADIUS = 180;
+export const ECHO_WAVE_DAMAGE = 18;
+export const PHASE_DASH_COOLDOWN_MULTIPLIER = 0.6;
+
 export const ENEMY_HIT_BARKS = [
   'Скверна шипит: "Р-рра!"',
   'Тварь рычит: "Не-еет!"',
@@ -65,6 +70,19 @@ export const ENEMY_SPAWN_POINTS: EnemySpawnPoint[] = [
   { x: 1620, y: 790, speed: 126, damage: 12 },
   { x: 1860, y: 930, speed: 130, damage: 13 },
 ];
+
+export const PROGRESSION_MODIFIERS = [
+  {
+    id: 'echo-wave',
+    title: 'Эхо-волна',
+    description: 'Каждое добивание выпускает волну, наносящую урон ближайшим врагам.',
+  },
+  {
+    id: 'phase-dash',
+    title: 'Фазовый рывок',
+    description: 'Рывок перезаряжается быстрее и может задевать врагов на траектории.',
+  },
+] as const;
 
 export const ONBOARDING_HINTS = [
   'Обучение: Двигайся WASD / стрелками. Управление не блокируется.',

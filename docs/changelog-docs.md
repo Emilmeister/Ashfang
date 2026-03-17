@@ -33,6 +33,8 @@
 - Добавлен документ по задаче `DEV-30` с целевым состоянием movement/attack и критериями проверки (`docs/project-management/dev-30-base-gameplay-enhancement.md`).
 - Добавлен документ по задаче `DEV-31` с реализацией мгновенного фидбэка в бою (`docs/project-management/dev-31-instant-feedback-juice.md`).
 - Добавлен документ по задаче `DEV-32` с реализацией решений риск/награда и нового ресурса (`docs/project-management/dev-32-risk-reward-decisions.md`).
+- Добавлен документ по задаче `DEV-33` с реализацией сессионной прогрессии и gameplay-модификаторов (`docs/project-management/dev-33-gameplay-changing-progression.md`).
+- Обновлена карта документации: добавлена ссылка на документ DEV-33.
 - Обновлена карта документации: добавлена ссылка на документ DEV-32.
 - Добавлен документ аудита кода и поэтапного рефакторинга по задаче `DEV-41` (`docs/project-management/dev-41-code-audit-refactoring.md`).
 - Добавлен документ по задаче `DEV-42` с аудитом тестового покрытия и планом проверок в CI/CD (`docs/project-management/dev-42-test-coverage-audit.md`).
