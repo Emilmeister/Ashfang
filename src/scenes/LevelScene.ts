@@ -44,6 +44,14 @@ export class LevelScene extends Phaser.Scene {
 
   private statusText!: Phaser.GameObjects.Text;
 
+  private onboardingText!: Phaser.GameObjects.Text;
+
+  private onboardingStepIndex = 0;
+
+  private hasMoved = false;
+
+  private hasAttacked = false;
+
   private wasdKeys?: {
     up: Phaser.Input.Keyboard.Key;
     down: Phaser.Input.Keyboard.Key;
@@ -137,6 +145,18 @@ export class LevelScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(20);
 
+    this.onboardingText = this.add
+      .text(this.scale.width - 24, 22, '', {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: '#93c5fd',
+        align: 'right',
+        wordWrap: { width: Math.min(this.scale.width * 0.44, 460) },
+      })
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(22);
+
     this.dialogueText = this.add
       .text(this.scale.width / 2, this.scale.height - 70, '', {
         fontFamily: 'Arial',
@@ -209,6 +229,8 @@ export class LevelScene extends Phaser.Scene {
     this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
       this.dialogueText.setPosition(gameSize.width / 2, gameSize.height - 70);
       this.dialogueText.setWordWrapWidth(Math.min(gameSize.width - 80, 900));
+      this.onboardingText.setPosition(gameSize.width - 24, 22);
+      this.onboardingText.setWordWrapWidth(Math.min(gameSize.width * 0.44, 460));
     });
 
     this.events.on('resume', () => {
@@ -218,6 +240,7 @@ export class LevelScene extends Phaser.Scene {
     });
 
     this.playIntroDialogue();
+    this.scheduleOnboardingHints();
     this.updateHud();
   }
 
@@ -250,11 +273,20 @@ export class LevelScene extends Phaser.Scene {
     const velocity = moveDirection.clone().scale(PLAYER_SPEED);
     this.player.setVelocity(velocity.x, velocity.y);
 
+    if (!this.hasMoved && moveDirection.lengthSq() > 0) {
+      this.hasMoved = true;
+      this.advanceOnboarding(1);
+    }
+
     if (
       this.attackKey &&
       Phaser.Input.Keyboard.JustDown(this.attackKey) &&
       time - this.lastAttackTime >= ATTACK_COOLDOWN_MS
     ) {
+      if (!this.hasAttacked) {
+        this.hasAttacked = true;
+        this.advanceOnboarding(2);
+      }
       this.performAttack(time);
     }
 
@@ -453,6 +485,7 @@ export class LevelScene extends Phaser.Scene {
 
   private unlockPortal(): void {
     this.portalUnlocked = true;
+    this.advanceOnboarding(3);
     this.statusText.setText('Статус: Путь к боссу открыт');
     this.objectiveText.setText('Цель: Войди в портал, чтобы добраться до Сердца руин');
     this.dialogueText.setText('Ashfang: Путь открыт. Источник скверны рядом.');
@@ -488,12 +521,65 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private playIntroDialogue(): void {
-    this.dialogueText.setText('Старейшина: Ashfang, в руинах пробудилась дикая скверна.');
+    this.dialogueText.setText('Астрелия: Ashfang, руины шепчут голосами павших и зовут к Сердцу.');
     this.time.delayedCall(3200, () => {
-      this.dialogueText.setText('Ashfang: Я очищу путь и доберусь до Сердца руин.');
+      this.dialogueText.setText('Ashfang: Я найду осколок и верну надежду племени Белого Пламени.');
     });
     this.time.delayedCall(6500, () => {
-      this.dialogueText.setText('Убей всех врагов. После этого активируется портал к боссу.');
+      this.dialogueText.setText('Очисти руины от скверны. Портал к Сердцу откроется после победы.');
+    });
+  }
+
+  private scheduleOnboardingHints(): void {
+    const hints = [
+      'Обучение: Двигайся WASD / стрелками. Управление не блокируется.',
+      'Обучение: Нажми SPACE для атаки в сторону движения.',
+      'Обучение: Победи всех врагов и войди в сияющий портал.',
+      'Обучение: Портал открыт! Доберись до него, чтобы начать бой с боссом.',
+    ];
+
+    this.showOnboarding(hints[0]);
+
+    this.time.delayedCall(7000, () => {
+      if (!this.hasMoved) {
+        this.showOnboarding('Подсказка: зажми W/A/S/D для рывка по руинам.');
+      }
+    });
+
+    this.time.delayedCall(13000, () => {
+      if (!this.hasAttacked) {
+        this.showOnboarding('Подсказка: SPACE — твой быстрый удар. Используй его чаще.');
+      }
+    });
+  }
+
+  private advanceOnboarding(stepIndex: number): void {
+    if (stepIndex <= this.onboardingStepIndex) {
+      return;
+    }
+
+    this.onboardingStepIndex = stepIndex;
+
+    if (stepIndex === 1) {
+      this.showOnboarding('Отлично! Теперь попробуй атаку: SPACE.');
+    } else if (stepIndex === 2) {
+      this.showOnboarding('Хорошо! Добей врагов и открой путь к порталу.');
+    } else if (stepIndex === 3) {
+      this.showOnboarding('Финал этапа: войди в портал, чтобы встретить источник скверны.');
+    }
+  }
+
+  private showOnboarding(text: string): void {
+    this.onboardingText.setAlpha(1);
+    this.onboardingText.setText(text);
+    this.tweens.killTweensOf(this.onboardingText);
+    this.tweens.add({
+      targets: this.onboardingText,
+      alpha: 0.72,
+      duration: 380,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Sine.easeInOut',
     });
   }
 
