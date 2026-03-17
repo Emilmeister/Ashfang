@@ -20,6 +20,7 @@ import {
   PLAYER_SPEED,
   PLAYER_TEXTURE_KEY,
 } from './boss/constants';
+import { playtestTelemetry } from '../telemetry/playtestTelemetry';
 
 export class BossScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -229,6 +230,7 @@ export class BossScene extends Phaser.Scene {
   }
 
   private endWithVictory(): void {
+    playtestTelemetry.finishRun('victory');
     this.startEndState('Статус: Победа');
     this.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.36 });
     this.boss.disableBody(true, true);
@@ -236,6 +238,7 @@ export class BossScene extends Phaser.Scene {
   }
 
   private endWithFailure(): void {
+    playtestTelemetry.finishRun('defeat');
     this.startEndState('Статус: Поражение');
     this.dialogueText.setText('Ashfang пал от босса. Нажми R для повторной попытки.');
     this.input.keyboard?.once('keydown-R', () => this.scene.restart({ playerHp: PLAYER_MAX_HP }));
@@ -255,6 +258,7 @@ export class BossScene extends Phaser.Scene {
 
   private togglePause(): void {
     if (this.ending || this.scene.isActive('Pause')) return;
+    playtestTelemetry.recordPause();
     this.statusText.setText('Статус: Пауза');
     this.scene.launch('Pause', { sourceScene: this.scene.key });
     this.scene.pause();
