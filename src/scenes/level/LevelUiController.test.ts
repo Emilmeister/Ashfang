@@ -73,10 +73,12 @@ describe('LevelUiController', () => {
       sessionKills: 1,
       progressionGoal: 2,
       activeModifiers: ['Эхо-волна'],
+      roomModifierTitle: 'Бешеная охота',
     });
 
     expect(ui.hudText.setText).toHaveBeenCalledWith(expect.stringContaining('HP: 120/180'));
     expect(ui.hudText.setText).toHaveBeenCalledWith(expect.stringContaining('Рывок: 1.1с'));
+    expect(ui.hudText.setText).toHaveBeenCalledWith(expect.stringContaining('Комната: Бешеная охота'));
     expect(ui.hudText.setText).toHaveBeenCalledWith(expect.stringContaining('Прогресс: 1/2'));
     expect(ui.objectiveText.setText).toHaveBeenCalledWith('Цель: Уничтожь врагов (4) и войди в портал');
     expect(ui.statusText.setText).toHaveBeenCalledWith('Статус: В бою | TTF: 1.8с | Безопасно: Q (дальний удар)');

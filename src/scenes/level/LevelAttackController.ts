@@ -26,6 +26,7 @@ type AttackDeps = {
   onEnemyDefeated: () => void;
   onAttackResult: (message: string, combatHappened?: boolean) => void;
   onRiskyHit: (count: number) => void;
+  getPlayerDamageMultiplier: () => number;
 };
 
 export class LevelAttackController {
@@ -86,7 +87,8 @@ export class LevelAttackController {
       const isRiskyMelee = distanceToPlayer <= RISKY_MELEE_RANGE;
       if (isRiskyMelee) riskyHits += 1;
 
-      const damage = Math.round(ATTACK_DAMAGE * (isRiskyMelee ? RISKY_DAMAGE_MULTIPLIER : 1));
+      const baseDamage = ATTACK_DAMAGE * this.deps.getPlayerDamageMultiplier();
+      const damage = Math.round(baseDamage * (isRiskyMelee ? RISKY_DAMAGE_MULTIPLIER : 1));
       enemyState.hp = Math.max(0, enemyState.hp - damage);
       enemyState.staggerUntil = this.scene.time.now + ENEMY_STAGGER_MS;
 
