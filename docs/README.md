@@ -10,6 +10,7 @@
 - [MVP scope и критерии успеха](./project-management/mvp-scope-success-criteria.md)
 - [План улучшения UX для MVP (DEV-28)](./project-management/dev-28-ux-improvement-plan.md)
 - [Документ по core loop и корневой проблеме (DEV-29)](./project-management/dev-29-core-loop-root-problem.md)
+- [План усиления базового gameplay (DEV-30)](./project-management/dev-30-base-gameplay-enhancement.md)
 - [Концепция игры Ashfang](./game-design/game-concept.md)
 - [Пак ассетов MVP](./game-design/mvp-asset-pack.md)
 
