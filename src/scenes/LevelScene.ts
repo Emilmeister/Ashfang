@@ -213,6 +213,7 @@ export class LevelScene extends Phaser.Scene {
     this.playerHp = Math.max(0, this.playerHp - damage);
     this.player.setTintFill(0xff6b6b);
     this.time.delayedCall(120, () => this.player.active && this.player.clearTint());
+    this.playDamageBurst(this.player.x, this.player.y);
     this.sound.play(PLAYER_HIT_SFX_KEY, { volume: 0.42 });
     this.cameras.main.shake(90, 0.0035);
     this.ui.setDialogue(`Тварь ранит Ashfang! -${damage} HP`);
@@ -220,6 +221,23 @@ export class LevelScene extends Phaser.Scene {
       this.failLevel();
     }
   }
+
+  private playDamageBurst(x: number, y: number): void {
+    for (let i = 0; i < 7; i += 1) {
+      const shard = this.add.circle(x, y, Phaser.Math.Between(2, 4), Phaser.Math.RND.pick([0xff6b6b, 0xffa8a8, 0xffffff]), 0.9).setDepth(14);
+      const offset = new Phaser.Math.Vector2().setToPolar(Phaser.Math.FloatBetween(0, Math.PI * 2), Phaser.Math.Between(16, 52));
+      this.tweens.add({
+        targets: shard,
+        x: x + offset.x,
+        y: y + offset.y,
+        alpha: 0,
+        duration: Phaser.Math.Between(90, 130),
+        ease: 'Quad.easeOut',
+        onComplete: () => shard.destroy(),
+      });
+    }
+  }
+
   private updateHud(): void {
     this.ui.updateHud({
       playerHp: this.playerHp,

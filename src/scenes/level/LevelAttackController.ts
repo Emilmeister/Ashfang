@@ -67,6 +67,8 @@ export class LevelAttackController {
     const hitEnemies = this.deps.getEnemies().filter((enemyState) => this.isEnemyHit(enemyState));
     if (hitEnemies.length === 0) return void this.deps.onAttackResult('Удар впустую. Враги наступают!');
 
+    let defeatedInSwing = 0;
+
     hitEnemies.forEach((enemyState) => {
       this.deps.onMeaningfulAction(true);
       enemyState.hp = Math.max(0, enemyState.hp - ATTACK_DAMAGE);
@@ -81,16 +83,23 @@ export class LevelAttackController {
       enemyState.sprite.setTintFill(0xfff1c1);
       this.scene.time.delayedCall(90, () => enemyState.sprite.active && enemyState.sprite.clearTint());
       this.scene.tweens.add({ targets: enemyState.sprite, scaleX: 1.2, scaleY: 0.84, duration: 55, yoyo: true, ease: 'Quad.easeOut' });
+      this.playHitBurst(enemyState.sprite.x, enemyState.sprite.y);
 
       if (enemyState.hp <= 0) {
+        defeatedInSwing += 1;
         enemyState.sprite.disableBody(true, true);
         this.scene.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.34 });
+        this.playFinisherFeedback(enemyState.sprite.x, enemyState.sprite.y);
         this.deps.onEnemyDefeated();
       }
     });
 
     this.scene.cameras.main.shake(90, 0.002);
-    this.deps.onAttackResult(`Попадание x${hitEnemies.length}. Осталось врагов: ${this.deps.getAliveEnemiesCount()}`, true);
+    const message =
+      defeatedInSwing > 0
+        ? `Попадание x${hitEnemies.length}. Добивание x${defeatedInSwing}! Осталось врагов: ${this.deps.getAliveEnemiesCount()}`
+        : `Попадание x${hitEnemies.length}. Осталось врагов: ${this.deps.getAliveEnemiesCount()}`;
+    this.deps.onAttackResult(message, true);
   }
 
   private playAttackStartup(): void {
@@ -113,7 +122,10 @@ export class LevelAttackController {
     });
 
     const angle = Phaser.Math.RadToDeg(this.deps.playerFacing.angle());
-    const slash = this.scene.add.arc(this.deps.player.x, this.deps.player.y, ATTACK_RANGE, angle - 35, angle + 35, false, 0xf1fa8c, 0.45).setStrokeStyle(3, 0xffffff, 0.85).setDepth(8);
+    const slash = this.scene.add
+      .arc(this.deps.player.x, this.deps.player.y, ATTACK_RANGE, angle - 35, angle + 35, false, 0xf1fa8c, 0.45)
+      .setStrokeStyle(3, 0xffffff, 0.85)
+      .setDepth(8);
     this.scene.tweens.add({ targets: slash, alpha: 0, scale: 1.25, duration: 110, ease: 'Quad.easeOut', onComplete: () => slash.destroy() });
   }
 
@@ -127,6 +139,31 @@ export class LevelAttackController {
       ease: 'Sine.easeOut',
       onComplete: () => this.deps.player.setAlpha(1),
     });
+  }
+
+  private playHitBurst(x: number, y: number): void {
+    for (let i = 0; i < 8; i += 1) {
+      const spark = this.scene.add.circle(x, y, Phaser.Math.Between(2, 4), Phaser.Math.RND.pick([0xfff1c1, 0xffd166, 0xffffff]), 0.9).setDepth(12);
+      const velocity = new Phaser.Math.Vector2().setToPolar(Phaser.Math.FloatBetween(0, Math.PI * 2), Phaser.Math.Between(20, 65));
+      this.scene.tweens.add({
+        targets: spark,
+        x: x + velocity.x,
+        y: y + velocity.y,
+        alpha: 0,
+        scale: 0.25,
+        duration: Phaser.Math.Between(90, 140),
+        ease: 'Quad.easeOut',
+        onComplete: () => spark.destroy(),
+      });
+    }
+  }
+
+  private playFinisherFeedback(x: number, y: number): void {
+    const flash = this.scene.add.circle(x, y, 22, 0xfff3b0, 0.75).setDepth(13);
+    this.scene.tweens.add({ targets: flash, alpha: 0, scale: 2.8, duration: 170, ease: 'Cubic.easeOut', onComplete: () => flash.destroy() });
+    this.scene.cameras.main.shake(120, 0.0032);
+    this.scene.cameras.main.flash(90, 255, 244, 214, false);
+    this.scene.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.2, detune: 450, rate: 1.15 });
   }
 
   private isEnemyHit(enemyState: EnemyState): boolean {

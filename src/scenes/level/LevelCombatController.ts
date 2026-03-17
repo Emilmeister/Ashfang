@@ -180,6 +180,12 @@ export class LevelCombatController {
     enemyState.lastHitTime = now;
     this.deps.onMeaningfulAction();
     this.lastMeaningfulActionTime = now;
+
+    const pushDirection = new Phaser.Math.Vector2(this.deps.player.x - enemyState.sprite.x, this.deps.player.y - enemyState.sprite.y);
+    if (pushDirection.lengthSq() > 0) pushDirection.normalize();
+    this.deps.player.setVelocity(pushDirection.x * 220, pushDirection.y * 220);
+    enemyState.staggerUntil = now + 110;
+
     this.deps.onEnemyHitPlayer(enemyState.damage);
   }
 }
