@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import {
-  BACKGROUND_TEXTURE_KEY,
   ENEMY_SPAWN_POINTS,
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -15,6 +14,7 @@ import {
 } from './level/constants';
 import { LevelCombatController } from './level/LevelCombatController';
 import { createLevelUiElements } from './level/LevelUiFactory';
+import { createLevelArena } from './level/LevelArenaFactory';
 import { LevelUiController } from './level/LevelUiController';
 import type { ProgressionModifier, RoomModifier, WasdKeys } from './level/types';
 export class LevelScene extends Phaser.Scene {
@@ -46,7 +46,7 @@ export class LevelScene extends Phaser.Scene {
   }
   create(): void {
     this.levelStartTime = this.time.now;
-    this.createArena();
+    createLevelArena(this);
     this.createPlayer();
     this.createObstacles();
     this.createPortal();
@@ -116,13 +116,6 @@ export class LevelScene extends Phaser.Scene {
       this.unlockPortal();
     }
     this.updateHud();
-  }
-  private createArena(): void {
-    this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    this.add.tileSprite(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, BACKGROUND_TEXTURE_KEY).setTint(0x676767).setDepth(-10);
-    this.add.rectangle(110, 110, 180, 180, 0x4caf50, 0.15).setStrokeStyle(4, 0x7bed9f, 0.75).setDepth(-1);
-    this.add.text(30, 32, 'Старт: Руины Пепла', { fontFamily: 'Arial', fontSize: '20px', color: '#d7ffd6' }).setDepth(1);
   }
   private createPlayer(): void {
     this.player = this.physics.add
