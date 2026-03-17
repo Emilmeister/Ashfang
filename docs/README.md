@@ -8,6 +8,7 @@
 - [Шаблон ADR](./templates/ADR_TEMPLATE.md)
 - [Декомпозиция задач для выпуска MVP](./project-management/mvp-roadmap-tasks.md)
 - [MVP scope и критерии успеха](./project-management/mvp-scope-success-criteria.md)
+- [План улучшения UX для MVP (DEV-28)](./project-management/dev-28-ux-improvement-plan.md)
 - [Концепция игры Ashfang](./game-design/game-concept.md)
 - [Пак ассетов MVP](./game-design/mvp-asset-pack.md)
 
