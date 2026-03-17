@@ -17,6 +17,7 @@
 - [Документ по прогрессии, меняющей геймплей (DEV-33)](./project-management/dev-33-gameplay-changing-progression.md)
 - [Документ по вариативности и неожиданности (DEV-34)](./project-management/dev-34-variability-unpredictability.md)
 - [Документ по удалению скучных промежутков (DEV-35)](./project-management/dev-35-remove-boring-downtime.md)
+- [Документ по playtesting-циклу и метрикам (DEV-36)](./project-management/dev-36-playtesting-primary-decision-source.md)
 - [Аудит кода и план рефакторинга (DEV-41)](./project-management/dev-41-code-audit-refactoring.md)
 - [Аудит больших файлов и распил сцен (DEV-43)](./project-management/dev-43-large-files-audit.md)
 - [Аудит покрытия кода тестами (DEV-42)](./project-management/dev-42-test-coverage-audit.md)

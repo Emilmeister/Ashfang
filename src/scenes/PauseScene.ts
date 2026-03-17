@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playtestTelemetry } from '../telemetry/playtestTelemetry';
 
 type PauseSceneData = {
   sourceScene: string;
@@ -50,6 +51,8 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private goToMenu(): void {
+    playtestTelemetry.recordMenuExit();
+    playtestTelemetry.finishRun('abandoned');
     if (this.sourceScene) {
       this.scene.stop(this.sourceScene);
     }

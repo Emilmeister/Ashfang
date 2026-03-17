@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playtestTelemetry } from '../telemetry/playtestTelemetry';
 
 const UI_CONFIRM_SFX_KEY = 'sfx-ui-confirm';
 
@@ -37,6 +38,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.input.keyboard?.once('keydown-SPACE', () => {
+      playtestTelemetry.startRun();
       this.sound.play(UI_CONFIRM_SFX_KEY, { volume: 0.45 });
       this.scene.start('Level');
     });

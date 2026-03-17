@@ -17,6 +17,7 @@ import { createLevelUiElements } from './level/LevelUiFactory';
 import { createLevelArena } from './level/LevelArenaFactory';
 import { LevelUiController } from './level/LevelUiController';
 import type { ProgressionModifier, RoomModifier, WasdKeys } from './level/types';
+import { playtestTelemetry } from '../telemetry/playtestTelemetry';
 export class LevelScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -64,6 +65,7 @@ export class LevelScene extends Phaser.Scene {
         this.ui.setDialogue(message);
         if (isCombat && this.firstCombatTimeMs === null) {
           this.firstCombatTimeMs = this.time.now - this.levelStartTime;
+          playtestTelemetry.recordTimeToFun(this.firstCombatTimeMs);
         }
       },
       onDash: () => this.ui.advanceOnboarding(3),
@@ -71,6 +73,7 @@ export class LevelScene extends Phaser.Scene {
         this.combat.markMeaningfulAction();
         if (isCombat && this.firstCombatTimeMs === null) {
           this.firstCombatTimeMs = this.time.now - this.levelStartTime;
+          playtestTelemetry.recordTimeToFun(this.firstCombatTimeMs);
         }
       },
     });
@@ -267,6 +270,7 @@ export class LevelScene extends Phaser.Scene {
   }
   private togglePause(): void {
     if (this.isCompleting || this.scene.isActive('Pause')) return;
+    playtestTelemetry.recordPause();
     this.ui.setStatus('Статус: Пауза');
     this.scene.launch('Pause', { sourceScene: this.scene.key });
     this.scene.pause();
@@ -278,6 +282,7 @@ export class LevelScene extends Phaser.Scene {
     this.time.delayedCall(1000, () => this.scene.start('Boss', { playerHp: this.playerHp }));
   }
   private failLevel(): void {
+    playtestTelemetry.finishRun('defeat');
     this.startEndState('Статус: Поражение');
     this.ui.setDialogue('Ashfang пал. Нажми R, чтобы начать заново.');
     this.input.keyboard?.once('keydown-R', () => this.scene.restart());
