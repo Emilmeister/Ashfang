@@ -7,6 +7,11 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     this.add
+      .image(this.scale.width / 2, this.scale.height / 2, 'bg-ash-sky')
+      .setDisplaySize(this.scale.width, this.scale.height)
+      .setTint(0x666666);
+
+    this.add
       .text(this.scale.width / 2, this.scale.height / 2, 'Ashfang\nPress SPACE to start', {
         fontFamily: 'Arial',
         fontSize: '48px',

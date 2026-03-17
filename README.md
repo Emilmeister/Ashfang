@@ -24,6 +24,7 @@ npm run dev
 - `src/scenes/BootScene.ts` — базовая загрузочная сцена;
 - `src/scenes/MenuScene.ts` — шаблон главного меню;
 - `src/scenes/LevelScene.ts` — шаблон игрового уровня.
+- `public/assets/` — внешние игровые ассеты (добавляются отдельным коммитом, см. `docs/game-design/mvp-asset-pack.md`);
 
 
 ## CI/CD
