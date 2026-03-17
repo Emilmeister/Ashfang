@@ -12,6 +12,8 @@ const ATTACK_RANGE = 102;
 const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(46);
 const PLAYER_MAX_HP = 180;
 const PLAYER_HIT_COOLDOWN_MS = 650;
+const DOWNTIME_LIMIT_MS = 5000;
+const MAX_PRESSURE_SPAWNS = 3;
 
 const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
 const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
@@ -71,13 +73,26 @@ export class LevelScene extends Phaser.Scene {
 
   private portalZone?: Phaser.GameObjects.Zone;
 
+  private obstacleGroup?: Phaser.Physics.Arcade.StaticGroup;
+
   private isCompleting = false;
+
+  private levelStartTime = 0;
+
+  private firstCombatTimeMs: number | null = null;
+
+  private lastMeaningfulActionTime = 0;
+
+  private pressureSpawnCount = 0;
 
   constructor() {
     super('Level');
   }
 
   create(): void {
+    this.levelStartTime = this.time.now;
+    this.lastMeaningfulActionTime = this.levelStartTime;
+
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.add
@@ -137,7 +152,7 @@ export class LevelScene extends Phaser.Scene {
       .setDepth(20);
 
     this.statusText = this.add
-      .text(22, 76, 'Статус: В бою', {
+      .text(22, 76, 'Статус: В бою | TTF: в процессе', {
         fontFamily: 'Arial',
         fontSize: '20px',
         color: '#7dd3fc',
@@ -170,6 +185,7 @@ export class LevelScene extends Phaser.Scene {
       .setDepth(20);
 
     const obstacles = this.physics.add.staticGroup();
+    this.obstacleGroup = obstacles;
     const obstacleData: Array<{ x: number; y: number; width: number; height: number }> = [
       { x: 460, y: 300, width: 720, height: 70 },
       { x: 1220, y: 560, width: 420, height: 70 },
@@ -200,6 +216,7 @@ export class LevelScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.player, this.portalZone, () => {
       if (this.portalUnlocked && !this.isCompleting) {
+        this.markMeaningfulAction();
         this.completeLevel();
       }
     });
@@ -291,6 +308,7 @@ export class LevelScene extends Phaser.Scene {
     }
 
     this.updateEnemies(time);
+    this.maybeTriggerDowntimeEvent(time);
     this.updateHud();
 
     if (!this.portalUnlocked && this.getAliveEnemies().length === 0) {
@@ -329,6 +347,38 @@ export class LevelScene extends Phaser.Scene {
     });
   }
 
+  private spawnPressureEnemy(): void {
+    if (this.pressureSpawnCount >= MAX_PRESSURE_SPAWNS || this.portalUnlocked) {
+      return;
+    }
+
+    const spawnOffset = new Phaser.Math.Vector2().setToPolar(Phaser.Math.FloatBetween(0, Math.PI * 2), 220);
+    const spawnX = Phaser.Math.Clamp(this.player.x + spawnOffset.x, 40, MAP_WIDTH - 40);
+    const spawnY = Phaser.Math.Clamp(this.player.y + spawnOffset.y, 40, MAP_HEIGHT - 40);
+    const enemy = this.physics.add
+      .sprite(spawnX, spawnY, ENEMY_TEXTURE_KEY)
+      .setDisplaySize(44, 44)
+      .setCollideWorldBounds(true)
+      .setTint(0xff9f43);
+
+    const enemyState: EnemyState = {
+      sprite: enemy,
+      hp: ENEMY_MAX_HP,
+      speed: 140,
+      damage: 14,
+      lastHitTime: -Infinity,
+    };
+
+    this.enemies.push(enemyState);
+    if (this.obstacleGroup) {
+      this.physics.add.collider(enemy, this.obstacleGroup);
+    }
+    this.physics.add.collider(this.player, enemy, () => this.onEnemyTouchPlayer(enemyState));
+
+    this.pressureSpawnCount += 1;
+    this.dialogueText.setText('Скверна чувствует паузу — новая тварь выходит на охоту!');
+  }
+
   private updateEnemies(time: number): void {
     this.getAliveEnemies().forEach((enemyState) => {
       const direction = new Phaser.Math.Vector2(this.player.x - enemyState.sprite.x, this.player.y - enemyState.sprite.y);
@@ -361,6 +411,7 @@ export class LevelScene extends Phaser.Scene {
     }
 
     enemyState.lastHitTime = now;
+    this.markMeaningfulAction();
     this.playerHp = Math.max(0, this.playerHp - enemyState.damage);
     this.player.setTintFill(0xff6b6b);
 
@@ -382,6 +433,7 @@ export class LevelScene extends Phaser.Scene {
 
   private performAttack(time: number): void {
     this.lastAttackTime = time;
+    this.markMeaningfulAction();
     this.sound.play(ATTACK_SFX_KEY, { volume: 0.5 });
     this.playAttackAnimation();
 
@@ -393,6 +445,7 @@ export class LevelScene extends Phaser.Scene {
     }
 
     hitEnemies.forEach((enemyState) => {
+      this.markMeaningfulAction(true);
       enemyState.hp = Math.max(0, enemyState.hp - ATTACK_DAMAGE);
       enemyState.sprite.setTintFill(0xffffff);
       this.time.delayedCall(90, () => {
@@ -466,7 +519,17 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
-    this.hudText.setText(`HP: ${this.playerHp}/${PLAYER_MAX_HP} | Враги: ${this.getAliveEnemies().length} | FPS: ${Math.round(this.game.loop.actualFps)}`);
+    const aliveEnemies = this.getAliveEnemies().length;
+    const elapsedSeconds = Math.max(0, Math.round((this.time.now - this.levelStartTime) / 1000));
+    this.hudText.setText(`HP: ${this.playerHp}/${PLAYER_MAX_HP} | Враги: ${aliveEnemies} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.game.loop.actualFps)}`);
+
+    if (!this.portalUnlocked) {
+      this.objectiveText.setText(`Цель: Уничтожь врагов (${aliveEnemies}) и войди в портал`);
+    }
+
+    const ttfText = this.firstCombatTimeMs === null ? 'в процессе' : `${(this.firstCombatTimeMs / 1000).toFixed(1)}с`;
+    const statusLabel = this.portalUnlocked ? 'Путь к боссу открыт' : 'В бою';
+    this.statusText.setText(`Статус: ${statusLabel} | TTF: ${ttfText}`);
   }
 
   private togglePause(): void {
@@ -485,6 +548,7 @@ export class LevelScene extends Phaser.Scene {
 
   private unlockPortal(): void {
     this.portalUnlocked = true;
+    this.markMeaningfulAction();
     this.advanceOnboarding(3);
     this.statusText.setText('Статус: Путь к боссу открыт');
     this.objectiveText.setText('Цель: Войди в портал, чтобы добраться до Сердца руин');
@@ -585,5 +649,24 @@ export class LevelScene extends Phaser.Scene {
 
   private getFacingAngle(): number {
     return Phaser.Math.RadToDeg(this.playerFacing.angle());
+  }
+
+  private markMeaningfulAction(isCombat = false): void {
+    this.lastMeaningfulActionTime = this.time.now;
+
+    if (isCombat && this.firstCombatTimeMs === null) {
+      this.firstCombatTimeMs = this.time.now - this.levelStartTime;
+    }
+  }
+
+  private maybeTriggerDowntimeEvent(time: number): void {
+    if (this.portalUnlocked || this.getAliveEnemies().length === 0) {
+      return;
+    }
+
+    if (time - this.lastMeaningfulActionTime > DOWNTIME_LIMIT_MS) {
+      this.spawnPressureEnemy();
+      this.markMeaningfulAction();
+    }
   }
 }
