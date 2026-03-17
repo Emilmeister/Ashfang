@@ -23,6 +23,7 @@
 - `src/scenes/PauseScene.ts` — overlay-сцена паузы.
 - `src/style.css` — базовые стили контейнера.
 - `docs/README.md` — карта документации.
+- `docs/CODEBASE_RULES.md` — обязательные правила ведения кодовой базы (включая лимит <300 строк на production-файл).
 - `docs/game-design/game-concept.md` — концепция игры.
 - `docs/project-management/mvp-scope-success-criteria.md` — рамки и критерии успеха MVP.
 - `docs/project-management/mvp-roadmap-tasks.md` — декомпозиция задач к выпуску MVP.
@@ -62,6 +63,7 @@ npm run build
   2) подключить сцену в `src/game/config.ts`;
   3) описать назначение сцены в этом файле (`AGENTS.md`) и при необходимости в `README.md`.
 - Не смешивать крупные рефакторинги и gameplay-фичи в одном PR.
+- Перед завершением задачи сверяться с `docs/CODEBASE_RULES.md` и соблюдать лимит: production-файлы меньше 300 строк.
 
 ## Что делать агенту перед завершением задачи
 
