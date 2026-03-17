@@ -16,6 +16,7 @@
 - [Документ по решениям и риск/награде (DEV-32)](./project-management/dev-32-risk-reward-decisions.md)
 - [Документ по прогрессии, меняющей геймплей (DEV-33)](./project-management/dev-33-gameplay-changing-progression.md)
 - [Документ по вариативности и неожиданности (DEV-34)](./project-management/dev-34-variability-unpredictability.md)
+- [Документ по удалению скучных промежутков (DEV-35)](./project-management/dev-35-remove-boring-downtime.md)
 - [Аудит кода и план рефакторинга (DEV-41)](./project-management/dev-41-code-audit-refactoring.md)
 - [Аудит больших файлов и распил сцен (DEV-43)](./project-management/dev-43-large-files-audit.md)
 - [Аудит покрытия кода тестами (DEV-42)](./project-management/dev-42-test-coverage-audit.md)
@@ -25,5 +26,5 @@
 ## Статус
 
 - Владелец: @devops-agent
-- Последняя проверка: 2026-03-16
-- Следующий срок ревизии: 2026-04-16
+- Последняя проверка: 2026-03-17
+- Следующий срок ревизии: 2026-04-17
