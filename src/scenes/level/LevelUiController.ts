@@ -20,6 +20,9 @@ type HudState = {
   lastDashTime: number;
   spiritEnergy: number;
   strategyHint: string;
+  sessionKills: number;
+  progressionGoal: number | null;
+  activeModifiers: string[];
 };
 
 export class LevelUiController {
@@ -97,8 +100,11 @@ export class LevelUiController {
     const dashRemainingMs = Math.max(0, DASH_COOLDOWN_MS - (this.scene.time.now - state.lastDashTime));
     const dashLabel = dashRemainingMs > 0 ? `${(dashRemainingMs / 1000).toFixed(1)}с` : 'готов';
 
+    const modifierLabel = state.activeModifiers.length > 0 ? state.activeModifiers.join(', ') : 'нет';
+    const progressionLabel = state.progressionGoal ? `${state.sessionKills}/${state.progressionGoal}` : 'готово';
+
     this.ui.hudText.setText(
-      `HP: ${state.playerHp}/${PLAYER_MAX_HP} | Враги: ${state.aliveEnemies} | Дух: ${Math.round(state.spiritEnergy)}% | Рывок: ${dashLabel} | Атака: ${state.attackPhase} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.scene.game.loop.actualFps)}`,
+      `HP: ${state.playerHp}/${PLAYER_MAX_HP} | Враги: ${state.aliveEnemies} | Дух: ${Math.round(state.spiritEnergy)}% | Рывок: ${dashLabel} | Атака: ${state.attackPhase} | Прогресс: ${progressionLabel} | Моды: ${modifierLabel} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.scene.game.loop.actualFps)}`,
     );
 
     if (!state.portalUnlocked) {

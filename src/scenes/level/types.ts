@@ -20,3 +20,11 @@ export type WasdKeys = {
 
 export type EnemySpawnPoint = { x: number; y: number; speed: number; damage: number };
 export type ObstacleData = { x: number; y: number; width: number; height: number };
+
+export type ProgressionModifierId = 'echo-wave' | 'phase-dash';
+
+export type ProgressionModifier = {
+  id: ProgressionModifierId;
+  title: string;
+  description: string;
+};
