@@ -16,7 +16,7 @@ import {
 import { LevelCombatController } from './level/LevelCombatController';
 import { createLevelUiElements } from './level/LevelUiFactory';
 import { LevelUiController } from './level/LevelUiController';
-import type { ProgressionModifier, WasdKeys } from './level/types';
+import type { ProgressionModifier, RoomModifier, WasdKeys } from './level/types';
 export class LevelScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -40,6 +40,7 @@ export class LevelScene extends Phaser.Scene {
   private portalZone?: Phaser.GameObjects.Zone;
   private ui!: LevelUiController;
   private combat!: LevelCombatController;
+  private activeRoomModifier?: RoomModifier;
   constructor() {
     super('Level');
   }
@@ -74,6 +75,9 @@ export class LevelScene extends Phaser.Scene {
       },
     });
     this.combat.initialize(this.time.now);
+    this.activeRoomModifier = this.combat.selectRoomModifier();
+    this.applyRoomModifierVisuals(this.activeRoomModifier);
+    this.ui.setDialogue(`Модификатор комнаты: ${this.activeRoomModifier.title} — ${this.activeRoomModifier.description}`);
     this.combat.spawnEnemies(ENEMY_SPAWN_POINTS);
     this.ui.playIntroDialogue();
     this.ui.scheduleOnboardingHints(() => this.hasMoved, () => this.hasAttacked);
@@ -203,7 +207,6 @@ export class LevelScene extends Phaser.Scene {
       this.failLevel();
     }
   }
-
   private playDamageBurst(x: number, y: number): void {
     for (let i = 0; i < 7; i += 1) {
       const shard = this.add.circle(x, y, Phaser.Math.Between(2, 4), Phaser.Math.RND.pick([0xff6b6b, 0xffa8a8, 0xffffff]), 0.9).setDepth(14);
@@ -219,12 +222,7 @@ export class LevelScene extends Phaser.Scene {
       });
     }
   }
-
-  private onEnemyDefeated(): void {
-    this.sessionKills += 1;
-    this.tryGrantProgressModifier();
-  }
-
+  private onEnemyDefeated(): void { this.sessionKills += 1; this.tryGrantProgressModifier(); }
   private tryGrantProgressModifier(): void {
     if (this.progressionStepIndex >= SESSION_PROGRESS_OBJECTIVES.length) {
       return;
@@ -257,8 +255,15 @@ export class LevelScene extends Phaser.Scene {
       sessionKills: this.sessionKills,
       progressionGoal: SESSION_PROGRESS_OBJECTIVES[this.progressionStepIndex] ?? null,
       activeModifiers: this.combat.getActiveModifierIds().map((id) => PROGRESSION_MODIFIERS.find((modifier) => modifier.id === id)?.title ?? id),
+      roomModifierTitle: this.activeRoomModifier?.title ?? 'нет',
     });
   }
+
+  private applyRoomModifierVisuals(modifier: RoomModifier): void {
+    if (modifier.fogAlpha <= 0) return;
+    this.add.rectangle(MAP_WIDTH / 2, MAP_HEIGHT / 2, MAP_WIDTH, MAP_HEIGHT, 0xdfe6e9, modifier.fogAlpha).setDepth(-2);
+  }
+
   private unlockPortal(): void {
     this.portalUnlocked = true;
     this.combat.markMeaningfulAction();

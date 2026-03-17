@@ -39,3 +39,5 @@
 - Добавлен документ аудита кода и поэтапного рефакторинга по задаче `DEV-41` (`docs/project-management/dev-41-code-audit-refactoring.md`).
 - Добавлен документ по задаче `DEV-42` с аудитом тестового покрытия и планом проверок в CI/CD (`docs/project-management/dev-42-test-coverage-audit.md`).
 
+- Добавлен документ по задаче `DEV-34` с планом и реализацией вариативности/неожиданности (`docs/project-management/dev-34-variability-unpredictability.md`).
+- Обновлена карта документации: добавлена ссылка на документ DEV-34.

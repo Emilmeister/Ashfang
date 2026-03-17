@@ -13,6 +13,7 @@ import {
   PHASE_DASH_COOLDOWN_MULTIPLIER,
   PLAYER_HIT_COOLDOWN_MS,
   PLAYER_SPEED,
+  ROOM_MODIFIERS,
   SPIRIT_STRIKE_COST,
   SPIRIT_STRIKE_DAMAGE,
   SPIRIT_STRIKE_RANGE,
@@ -20,7 +21,8 @@ import {
 import { LevelAttackController } from './LevelAttackController';
 import { LevelProgressionController } from './LevelProgressionController';
 import { LevelSpiritEnergyController } from './LevelSpiritEnergyController';
-import type { AttackPhase, EnemyState, ProgressionModifierId } from './types';
+import { applyEnemyMovementByArchetype, getRandomizedSpawnPoints } from './LevelEnemyBehavior';
+import type { AttackPhase, EnemyArchetype, EnemySpawnPoint, EnemyState, ProgressionModifierId, RoomModifier } from './types';
 
 type Dependencies = {
   player: Phaser.Physics.Arcade.Sprite;
@@ -44,6 +46,7 @@ export class LevelCombatController {
   private readonly attackController: LevelAttackController;
   private readonly progressionController: LevelProgressionController;
   private readonly spiritEnergyController: LevelSpiritEnergyController;
+  private activeRoomModifier: RoomModifier = ROOM_MODIFIERS[0];
 
   constructor(private readonly scene: Phaser.Scene, private readonly deps: Dependencies) {
     this.progressionController = new LevelProgressionController(scene, {
@@ -72,8 +75,8 @@ export class LevelCombatController {
       },
       onAttackResult: deps.onAttackResult,
       onRiskyHit: (count) => this.spiritEnergyController.grantRiskEnergy(8 * count),
+      getPlayerDamageMultiplier: () => this.activeRoomModifier.playerDamageMultiplier,
     });
-
   }
 
   initialize(now: number): void {
@@ -81,11 +84,19 @@ export class LevelCombatController {
     this.spiritEnergyController.initialize(now);
   }
 
-  spawnEnemies(spawnPoints: Array<{ x: number; y: number; speed: number; damage: number }>): void {
-    spawnPoints.forEach((spawnPoint) => {
-      this.createEnemy(spawnPoint.x, spawnPoint.y, spawnPoint.speed, spawnPoint.damage, this.deps.obstacleGroup);
-    });
+  selectRoomModifier(): RoomModifier {
+    this.activeRoomModifier = Phaser.Utils.Array.GetRandom([...ROOM_MODIFIERS]);
+    return this.activeRoomModifier;
+  }
 
+  getActiveRoomModifier(): RoomModifier {
+    return this.activeRoomModifier;
+  }
+
+  spawnEnemies(spawnPoints: EnemySpawnPoint[]): void {
+    getRandomizedSpawnPoints(spawnPoints).forEach((spawnPoint) => {
+      this.createEnemy(spawnPoint.x, spawnPoint.y, spawnPoint.speed, spawnPoint.damage, spawnPoint.archetype, this.deps.obstacleGroup);
+    });
   }
 
   addModifier(modifierId: ProgressionModifierId): void {
@@ -131,7 +142,7 @@ export class LevelCombatController {
 
     this.spiritEnergyController.consume(SPIRIT_STRIKE_COST);
     this.deps.onMeaningfulAction(true);
-    target.hp = Math.max(0, target.hp - SPIRIT_STRIKE_DAMAGE);
+    target.hp = Math.max(0, target.hp - Math.round(SPIRIT_STRIKE_DAMAGE * this.activeRoomModifier.playerDamageMultiplier));
     target.staggerUntil = this.scene.time.now + 260;
     target.sprite.setTint(0x7afcff);
     this.scene.time.delayedCall(140, () => target.sprite.active && target.sprite.clearTint());
@@ -184,10 +195,7 @@ export class LevelCombatController {
       if (time < enemyState.staggerUntil) return;
       if (distance < 2) return void enemyState.sprite.setVelocity(0, 0);
 
-      direction.normalize();
-      enemyState.sprite.setVelocity(direction.x * enemyState.speed, direction.y * enemyState.speed);
-      enemyState.sprite.setFlipX(direction.x < 0);
-
+      applyEnemyMovementByArchetype(enemyState, direction, distance, time, this.activeRoomModifier.enemySpeedMultiplier);
       if (distance <= 64 && time - enemyState.lastHitTime >= PLAYER_HIT_COOLDOWN_MS) this.onEnemyTouchPlayer(enemyState);
     });
 
@@ -195,9 +203,7 @@ export class LevelCombatController {
   }
 
   maybeTriggerDowntimeEvent(time: number, portalUnlocked: boolean): void {
-    if (portalUnlocked || this.getAliveEnemies().length === 0) return;
-    if (time - this.lastMeaningfulActionTime <= DOWNTIME_LIMIT_MS) return;
-
+    if (portalUnlocked || this.getAliveEnemies().length === 0 || time - this.lastMeaningfulActionTime <= DOWNTIME_LIMIT_MS) return;
     this.spawnPressureEnemy();
     this.deps.onMeaningfulAction();
     this.lastMeaningfulActionTime = this.scene.time.now;
@@ -213,10 +219,7 @@ export class LevelCombatController {
 
   getLastDashTime(): number { return this.lastDashTime; }
   getSpiritEnergy(): number { return this.spiritEnergyController.getEnergy(); }
-  getStrategyHint(): string {
-    return this.spiritEnergyController.getEnergy() >= SPIRIT_STRIKE_COST ? 'Безопасно: Q (дальний удар)' : 'Риск: ближний бой для бонуса';
-  }
-
+  getStrategyHint(): string { return this.spiritEnergyController.getEnergy() >= SPIRIT_STRIKE_COST ? 'Безопасно: Q (дальний удар)' : 'Риск: ближний бой для бонуса'; }
   markMeaningfulAction(): void { this.lastMeaningfulActionTime = this.scene.time.now; }
 
   private spawnPressureEnemy(): void {
@@ -225,7 +228,7 @@ export class LevelCombatController {
     const spawnOffset = new Phaser.Math.Vector2().setToPolar(Phaser.Math.FloatBetween(0, Math.PI * 2), 220);
     const spawnX = Phaser.Math.Clamp(this.deps.player.x + spawnOffset.x, 40, MAP_WIDTH - 40);
     const spawnY = Phaser.Math.Clamp(this.deps.player.y + spawnOffset.y, 40, MAP_HEIGHT - 40);
-    this.createEnemy(spawnX, spawnY, 140, 14, this.deps.obstacleGroup, 0xff9f43);
+    this.createEnemy(spawnX, spawnY, 140, 14, 'raider', this.deps.obstacleGroup, 0xff9f43);
 
     this.pressureSpawnCount += 1;
     this.deps.onAttackResult('Скверна чувствует паузу — новая тварь выходит на охоту!');
@@ -236,25 +239,36 @@ export class LevelCombatController {
     y: number,
     speed: number,
     damage: number,
+    archetype: EnemyArchetype,
     obstacles?: Phaser.Physics.Arcade.StaticGroup,
     tint?: number,
   ): void {
     const enemy = this.scene.physics.add.sprite(x, y, ENEMY_TEXTURE_KEY).setDisplaySize(44, 44).setCollideWorldBounds(true);
     if (typeof tint === 'number') enemy.setTint(tint);
 
-    const enemyState: EnemyState = { sprite: enemy, hp: ENEMY_MAX_HP, speed, damage, lastHitTime: -Infinity, staggerUntil: -Infinity };
+    const enemyState: EnemyState = {
+      sprite: enemy,
+      hp: ENEMY_MAX_HP,
+      speed,
+      damage,
+      archetype,
+      lastHitTime: -Infinity,
+      staggerUntil: -Infinity,
+      orbitDirection: Phaser.Math.Between(0, 1) === 0 ? -1 : 1,
+      burstReadyAt: 0,
+    };
     this.enemies.push(enemyState);
 
     if (obstacles) this.scene.physics.add.collider(enemy, obstacles);
     this.scene.physics.add.collider(this.deps.player, enemy, () => this.onEnemyTouchPlayer(enemyState));
   }
 
+
   private onEnemyTouchPlayer(enemyState: EnemyState): void {
     if (!enemyState.sprite.active) return;
 
     const now = this.scene.time.now;
     if (now - enemyState.lastHitTime < PLAYER_HIT_COOLDOWN_MS) return;
-
     enemyState.lastHitTime = now;
     this.deps.onMeaningfulAction();
     this.lastMeaningfulActionTime = now;

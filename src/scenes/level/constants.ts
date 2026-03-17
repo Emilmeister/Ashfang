@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { EnemySpawnPoint, ObstacleData } from './types';
+import type { EnemySpawnPoint, ObstacleData, RoomModifier } from './types';
 
 export const PLAYER_SPEED = 240;
 export const MAP_WIDTH = 2200;
@@ -63,12 +63,12 @@ export const OBSTACLE_DATA: ObstacleData[] = [
 ];
 
 export const ENEMY_SPAWN_POINTS: EnemySpawnPoint[] = [
-  { x: 340, y: 160, speed: 92, damage: 10 },
-  { x: 690, y: 250, speed: 106, damage: 10 },
-  { x: 1040, y: 210, speed: 115, damage: 11 },
-  { x: 1380, y: 520, speed: 118, damage: 12 },
-  { x: 1620, y: 790, speed: 126, damage: 12 },
-  { x: 1860, y: 930, speed: 130, damage: 13 },
+  { x: 340, y: 160, speed: 92, damage: 10, archetype: 'stalker' },
+  { x: 690, y: 250, speed: 106, damage: 10, archetype: 'raider' },
+  { x: 1040, y: 210, speed: 115, damage: 11, archetype: 'brute' },
+  { x: 1380, y: 520, speed: 118, damage: 12, archetype: 'spitter' },
+  { x: 1620, y: 790, speed: 126, damage: 12, archetype: 'stalker' },
+  { x: 1860, y: 930, speed: 130, damage: 13, archetype: 'raider' },
 ];
 
 export const PROGRESSION_MODIFIERS = [
@@ -92,3 +92,31 @@ export const ONBOARDING_HINTS = [
   'Обучение: Победи всех врагов и войди в сияющий портал.',
   'Обучение: Портал открыт! Доберись до него, чтобы начать бой с боссом.',
 ];
+
+
+export const ROOM_MODIFIERS: RoomModifier[] = [
+  {
+    id: 'fog',
+    title: 'Пепельный туман',
+    description: 'Видимость снижена: сложнее читать дистанцию и фланги.',
+    enemySpeedMultiplier: 1,
+    playerDamageMultiplier: 1,
+    fogAlpha: 0.2,
+  },
+  {
+    id: 'swift-enemies',
+    title: 'Бешеная охота',
+    description: 'Скверна ускоряется и быстрее закрывает дистанцию.',
+    enemySpeedMultiplier: 1.18,
+    playerDamageMultiplier: 1,
+    fogAlpha: 0,
+  },
+  {
+    id: 'empowered-strikes',
+    title: 'Пламя предков',
+    description: 'Удары Ashfang мощнее и лучше режут толпу.',
+    enemySpeedMultiplier: 1,
+    playerDamageMultiplier: 1.22,
+    fogAlpha: 0,
+  },
+] as const;

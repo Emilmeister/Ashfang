@@ -23,6 +23,7 @@ type HudState = {
   sessionKills: number;
   progressionGoal: number | null;
   activeModifiers: string[];
+  roomModifierTitle: string;
 };
 
 export class LevelUiController {
@@ -104,7 +105,7 @@ export class LevelUiController {
     const progressionLabel = state.progressionGoal ? `${state.sessionKills}/${state.progressionGoal}` : 'готово';
 
     this.ui.hudText.setText(
-      `HP: ${state.playerHp}/${PLAYER_MAX_HP} | Враги: ${state.aliveEnemies} | Дух: ${Math.round(state.spiritEnergy)}% | Рывок: ${dashLabel} | Атака: ${state.attackPhase} | Прогресс: ${progressionLabel} | Моды: ${modifierLabel} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.scene.game.loop.actualFps)}`,
+      `HP: ${state.playerHp}/${PLAYER_MAX_HP} | Враги: ${state.aliveEnemies} | Дух: ${Math.round(state.spiritEnergy)}% | Рывок: ${dashLabel} | Атака: ${state.attackPhase} | Комната: ${state.roomModifierTitle} | Прогресс: ${progressionLabel} | Моды: ${modifierLabel} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.scene.game.loop.actualFps)}`,
     );
 
     if (!state.portalUnlocked) {
