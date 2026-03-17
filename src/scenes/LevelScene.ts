@@ -37,6 +37,8 @@ export class LevelScene extends Phaser.Scene {
 
   private objectiveText!: Phaser.GameObjects.Text;
 
+  private statusText!: Phaser.GameObjects.Text;
+
   private wasdKeys?: {
     up: Phaser.Input.Keyboard.Key;
     down: Phaser.Input.Keyboard.Key;
@@ -121,6 +123,15 @@ export class LevelScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(20);
 
+    this.statusText = this.add
+      .text(22, 76, 'Статус: В бою', {
+        fontFamily: 'Arial',
+        fontSize: '20px',
+        color: '#7dd3fc',
+      })
+      .setScrollFactor(0)
+      .setDepth(20);
+
     this.dialogueText = this.add
       .text(this.scale.width / 2, this.scale.height - 70, '', {
         fontFamily: 'Arial',
@@ -187,12 +198,18 @@ export class LevelScene extends Phaser.Scene {
       };
 
       this.attackKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-      keyboard.once('keydown-ESC', () => this.scene.start('Menu'));
+      keyboard.on('keydown-ESC', () => this.togglePause());
     }
 
     this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
       this.dialogueText.setPosition(gameSize.width / 2, gameSize.height - 70);
       this.dialogueText.setWordWrapWidth(Math.min(gameSize.width - 80, 900));
+    });
+
+    this.events.on('resume', () => {
+      if (!this.isCompleting) {
+        this.statusText.setText('Статус: В бою');
+      }
     });
 
     this.playIntroDialogue();
@@ -237,6 +254,7 @@ export class LevelScene extends Phaser.Scene {
     }
 
     this.updateEnemies(time);
+    this.updateHud();
 
     if (!this.portalUnlocked && this.getAliveEnemies().length === 0) {
       this.unlockPortal();
@@ -409,18 +427,30 @@ export class LevelScene extends Phaser.Scene {
     this.hudText.setText(`HP: ${this.playerHp}/${PLAYER_MAX_HP} | Враги: ${this.getAliveEnemies().length} | FPS: ${Math.round(this.game.loop.actualFps)}`);
   }
 
+  private togglePause(): void {
+    if (this.isCompleting || this.scene.isActive('Pause')) {
+      return;
+    }
+
+    this.statusText.setText('Статус: Пауза');
+    this.scene.launch('Pause', { sourceScene: this.scene.key });
+    this.scene.pause();
+  }
+
   private getAliveEnemies(): EnemyState[] {
     return this.enemies.filter((enemyState) => enemyState.hp > 0 && enemyState.sprite.active);
   }
 
   private unlockPortal(): void {
     this.portalUnlocked = true;
+    this.statusText.setText('Статус: Путь к боссу открыт');
     this.objectiveText.setText('Цель: Войди в портал, чтобы добраться до Сердца руин');
     this.dialogueText.setText('Ashfang: Путь открыт. Источник скверны рядом.');
   }
 
   private completeLevel(): void {
     this.isCompleting = true;
+    this.statusText.setText('Статус: Переход');
     this.player.setVelocity(0, 0);
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
     if (playerBody) {
@@ -435,6 +465,7 @@ export class LevelScene extends Phaser.Scene {
 
   private failLevel(): void {
     this.isCompleting = true;
+    this.statusText.setText('Статус: Поражение');
     this.player.setVelocity(0, 0);
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
     if (playerBody) {

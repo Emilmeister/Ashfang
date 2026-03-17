@@ -27,6 +27,8 @@ export class BossScene extends Phaser.Scene {
 
   private dialogueText!: Phaser.GameObjects.Text;
 
+  private statusText!: Phaser.GameObjects.Text;
+
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
 
   private wasdKeys?: {
@@ -113,6 +115,15 @@ export class BossScene extends Phaser.Scene {
       .setDepth(20)
       .setScrollFactor(0);
 
+    this.statusText = this.add
+      .text(20, 48, 'Статус: Битва с боссом', {
+        fontFamily: 'Arial',
+        fontSize: '20px',
+        color: '#7dd3fc',
+      })
+      .setScrollFactor(0)
+      .setDepth(20);
+
     const keyboard = this.input.keyboard;
     this.cursors = keyboard?.createCursorKeys();
 
@@ -130,7 +141,14 @@ export class BossScene extends Phaser.Scene {
       };
 
       this.attackKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      keyboard.on('keydown-ESC', () => this.togglePause());
     }
+
+    this.events.on('resume', () => {
+      if (!this.ending) {
+        this.statusText.setText('Статус: Битва с боссом');
+      }
+    });
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.updateHud();
@@ -248,6 +266,7 @@ export class BossScene extends Phaser.Scene {
 
   private endWithVictory(): void {
     this.ending = true;
+    this.statusText.setText('Статус: Победа');
     this.boss.disableBody(true, true);
     this.player.setVelocity(0, 0);
     this.dialogueText.setText('Победа! Сердце руин очищено. Нажми ENTER для возврата в меню.');
@@ -256,6 +275,7 @@ export class BossScene extends Phaser.Scene {
 
   private endWithFailure(): void {
     this.ending = true;
+    this.statusText.setText('Статус: Поражение');
     this.player.setVelocity(0, 0);
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
     if (playerBody) {
@@ -267,5 +287,15 @@ export class BossScene extends Phaser.Scene {
 
   private updateHud(): void {
     this.hudText.setText(`HP Ashfang: ${this.playerHp}/${PLAYER_MAX_HP} | HP Босса: ${this.bossHp}/${BOSS_MAX_HP}`);
+  }
+
+  private togglePause(): void {
+    if (this.ending || this.scene.isActive('Pause')) {
+      return;
+    }
+
+    this.statusText.setText('Статус: Пауза');
+    this.scene.launch('Pause', { sourceScene: this.scene.key });
+    this.scene.pause();
   }
 }
