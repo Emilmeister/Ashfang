@@ -6,11 +6,12 @@ const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
 const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
 
 const PLAYER_SPEED = 250;
-const PLAYER_MAX_HP = 140;
+const PLAYER_MAX_HP = 180;
 const PLAYER_HIT_COOLDOWN_MS = 700;
 const ATTACK_COOLDOWN_MS = 380;
-const ATTACK_RANGE = 82;
+const ATTACK_RANGE = 116;
 const ATTACK_DAMAGE = 25;
+const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(62);
 const BOSS_MAX_HP = 320;
 const BOSS_DAMAGE = 19;
 
@@ -188,11 +189,52 @@ export class BossScene extends Phaser.Scene {
       time - this.lastAttackTime >= ATTACK_COOLDOWN_MS
     ) {
       this.lastAttackTime = time;
+      this.playAttackAnimation();
       this.tryHitBoss();
     }
 
     this.updateBossAI();
     this.updateHud();
+  }
+
+
+  private playAttackAnimation(): void {
+    const baseScaleX = this.player.scaleX;
+    const baseScaleY = this.player.scaleY;
+
+    this.player.setTintFill(0xf1fa8c);
+
+    this.tweens.add({
+      targets: this.player,
+      scaleX: baseScaleX * 1.2,
+      scaleY: baseScaleY * 0.88,
+      yoyo: true,
+      duration: 85,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!this.player.active) {
+          return;
+        }
+
+        this.player.clearTint();
+        this.player.setScale(baseScaleX, baseScaleY);
+      },
+    });
+
+    const facingAngle = Phaser.Math.RadToDeg(this.playerFacing.angle());
+    const slash = this.add
+      .arc(this.player.x, this.player.y, ATTACK_RANGE, facingAngle - 40, facingAngle + 40, false, 0xf1fa8c, 0.42)
+      .setStrokeStyle(3, 0xffffff, 0.85)
+      .setDepth(8);
+
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      scale: 1.25,
+      duration: 110,
+      ease: 'Quad.easeOut',
+      onComplete: () => slash.destroy(),
+    });
   }
 
   private updateBossAI(): void {
@@ -253,9 +295,11 @@ export class BossScene extends Phaser.Scene {
     }
 
     const attackDirection = toBoss.normalize();
+    this.playerFacing.copy(attackDirection);
+    this.player.setFlipX(attackDirection.x < 0);
     const angleDiff = Phaser.Math.Angle.Wrap(this.playerFacing.angle() - attackDirection.angle());
 
-    if (Math.abs(angleDiff) > Phaser.Math.DegToRad(48)) {
+    if (Math.abs(angleDiff) > ATTACK_ARC_HALF_ANGLE) {
       this.dialogueText.setText('Ashfang не успел довернуть клинок!');
       return;
     }
