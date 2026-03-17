@@ -16,6 +16,11 @@ const PLAYER_HIT_COOLDOWN_MS = 650;
 const OBSTACLE_TEXTURE_KEY = 'object-ruin-crate';
 const BACKGROUND_TEXTURE_KEY = 'bg-ash-sky';
 
+const ATTACK_SFX_KEY = 'sfx-player-attack';
+const PLAYER_HIT_SFX_KEY = 'sfx-player-hit';
+const ENEMY_DOWN_SFX_KEY = 'sfx-enemy-down';
+const UI_CONFIRM_SFX_KEY = 'sfx-ui-confirm';
+
 type EnemyState = {
   sprite: Phaser.Physics.Arcade.Sprite;
   hp: number;
@@ -333,6 +338,7 @@ export class LevelScene extends Phaser.Scene {
       }
     });
 
+    this.sound.play(PLAYER_HIT_SFX_KEY, { volume: 0.42 });
     this.cameras.main.shake(90, 0.0035);
     this.dialogueText.setText(`Тварь ранит Ashfang! -${enemyState.damage} HP`);
     this.updateHud();
@@ -344,6 +350,7 @@ export class LevelScene extends Phaser.Scene {
 
   private performAttack(time: number): void {
     this.lastAttackTime = time;
+    this.sound.play(ATTACK_SFX_KEY, { volume: 0.5 });
     this.playAttackAnimation();
 
     const hitEnemies = this.enemies.filter((enemyState) => this.isEnemyHit(enemyState));
@@ -364,6 +371,7 @@ export class LevelScene extends Phaser.Scene {
 
       if (enemyState.hp <= 0) {
         enemyState.sprite.disableBody(true, true);
+        this.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.34 });
       }
     });
 
@@ -456,6 +464,7 @@ export class LevelScene extends Phaser.Scene {
     if (playerBody) {
       playerBody.enable = false;
     }
+    this.sound.play(UI_CONFIRM_SFX_KEY, { volume: 0.4 });
     this.dialogueText.setText('Переход в следующую зону...');
 
     this.time.delayedCall(1000, () => {
