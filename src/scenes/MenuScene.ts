@@ -26,7 +26,7 @@ export class MenuScene extends Phaser.Scene {
       .text(
         this.scale.width / 2,
         this.scale.height / 2 + 60,
-        'SPACE — начать уровень\nWASD/стрелки — движение\nSPACE — атака | SHIFT — рывок | ESC — пауза\nВ паузе: R/ESC — продолжить, M — меню',
+        'SPACE — начать уровень\nWASD/стрелки — движение\nSPACE — атака | SHIFT — рывок | Q — удар духа | ESC — пауза\nВ паузе: R/ESC — продолжить, M — меню',
         {
           fontFamily: 'Arial',
           fontSize: '24px',

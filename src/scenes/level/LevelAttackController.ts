@@ -9,8 +9,11 @@ import {
   ATTACK_SFX_KEY,
   ATTACK_STARTUP_MS,
   ENEMY_DOWN_SFX_KEY,
+  ENEMY_HIT_BARKS,
   ENEMY_HIT_KNOCKBACK,
   ENEMY_STAGGER_MS,
+  RISKY_DAMAGE_MULTIPLIER,
+  RISKY_MELEE_RANGE,
 } from './constants';
 import type { AttackPhase, EnemyState } from './types';
 
@@ -22,6 +25,7 @@ type AttackDeps = {
   onMeaningfulAction: (isCombat?: boolean) => void;
   onEnemyDefeated: () => void;
   onAttackResult: (message: string, combatHappened?: boolean) => void;
+  onRiskyHit: (count: number) => void;
 };
 
 export class LevelAttackController {
@@ -68,10 +72,22 @@ export class LevelAttackController {
     if (hitEnemies.length === 0) return void this.deps.onAttackResult('Удар впустую. Враги наступают!');
 
     let defeatedInSwing = 0;
+    let riskyHits = 0;
 
     hitEnemies.forEach((enemyState) => {
       this.deps.onMeaningfulAction(true);
-      enemyState.hp = Math.max(0, enemyState.hp - ATTACK_DAMAGE);
+
+      const distanceToPlayer = Phaser.Math.Distance.Between(
+        enemyState.sprite.x,
+        enemyState.sprite.y,
+        this.deps.player.x,
+        this.deps.player.y,
+      );
+      const isRiskyMelee = distanceToPlayer <= RISKY_MELEE_RANGE;
+      if (isRiskyMelee) riskyHits += 1;
+
+      const damage = Math.round(ATTACK_DAMAGE * (isRiskyMelee ? RISKY_DAMAGE_MULTIPLIER : 1));
+      enemyState.hp = Math.max(0, enemyState.hp - damage);
       enemyState.staggerUntil = this.scene.time.now + ENEMY_STAGGER_MS;
 
       const knockbackDirection = new Phaser.Math.Vector2(
@@ -94,12 +110,18 @@ export class LevelAttackController {
       }
     });
 
+    if (riskyHits > 0) {
+      this.deps.onRiskyHit(riskyHits);
+    }
+
     this.scene.cameras.main.shake(90, 0.002);
-    const message =
+    const bark = Phaser.Utils.Array.GetRandom(ENEMY_HIT_BARKS);
+    const riskLabel = riskyHits > 0 ? ` | Риск-бонус x${riskyHits}` : '';
+    const resultLabel =
       defeatedInSwing > 0
         ? `Попадание x${hitEnemies.length}. Добивание x${defeatedInSwing}! Осталось врагов: ${this.deps.getAliveEnemiesCount()}`
         : `Попадание x${hitEnemies.length}. Осталось врагов: ${this.deps.getAliveEnemiesCount()}`;
-    this.deps.onAttackResult(message, true);
+    this.deps.onAttackResult(`${resultLabel}${riskLabel} | ${bark}`, true);
   }
 
   private playAttackStartup(): void {

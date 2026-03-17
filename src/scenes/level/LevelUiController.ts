@@ -18,6 +18,8 @@ type HudState = {
   firstCombatTimeMs: number | null;
   levelStartTime: number;
   lastDashTime: number;
+  spiritEnergy: number;
+  strategyHint: string;
 };
 
 export class LevelUiController {
@@ -96,7 +98,7 @@ export class LevelUiController {
     const dashLabel = dashRemainingMs > 0 ? `${(dashRemainingMs / 1000).toFixed(1)}с` : 'готов';
 
     this.ui.hudText.setText(
-      `HP: ${state.playerHp}/${PLAYER_MAX_HP} | Враги: ${state.aliveEnemies} | Рывок: ${dashLabel} | Атака: ${state.attackPhase} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.scene.game.loop.actualFps)}`,
+      `HP: ${state.playerHp}/${PLAYER_MAX_HP} | Враги: ${state.aliveEnemies} | Дух: ${Math.round(state.spiritEnergy)}% | Рывок: ${dashLabel} | Атака: ${state.attackPhase} | Время: ${elapsedSeconds}с | FPS: ${Math.round(this.scene.game.loop.actualFps)}`,
     );
 
     if (!state.portalUnlocked) {
@@ -105,7 +107,7 @@ export class LevelUiController {
 
     const ttfText = state.firstCombatTimeMs === null ? 'в процессе' : `${(state.firstCombatTimeMs / 1000).toFixed(1)}с`;
     const statusLabel = state.portalUnlocked ? 'Путь к боссу открыт' : 'В бою';
-    this.ui.statusText.setText(`Статус: ${statusLabel} | TTF: ${ttfText}`);
+    this.ui.statusText.setText(`Статус: ${statusLabel} | TTF: ${ttfText} | ${state.strategyHint}`);
   }
 
   private showOnboarding(text: string): void {

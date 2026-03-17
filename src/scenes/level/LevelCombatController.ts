@@ -12,6 +12,12 @@ import {
   MOVEMENT_SMOOTHING,
   PLAYER_HIT_COOLDOWN_MS,
   PLAYER_SPEED,
+  SPIRIT_ENERGY_MAX,
+  SPIRIT_PASSIVE_REGEN_PER_SEC,
+  SPIRIT_RISK_REGEN_PER_SEC,
+  SPIRIT_STRIKE_COST,
+  SPIRIT_STRIKE_DAMAGE,
+  SPIRIT_STRIKE_RANGE,
 } from './constants';
 import { LevelAttackController } from './LevelAttackController';
 import type { AttackPhase, EnemyState } from './types';
@@ -35,6 +41,8 @@ export class LevelCombatController {
   private dashEndTime = -Infinity;
   private lastMeaningfulActionTime = 0;
   private pressureSpawnCount = 0;
+  private spiritEnergy = SPIRIT_ENERGY_MAX;
+  private lastEnergyTickTime = 0;
   private readonly attackController: LevelAttackController;
 
   constructor(private readonly scene: Phaser.Scene, private readonly deps: Dependencies) {
@@ -49,11 +57,13 @@ export class LevelCombatController {
       },
       onEnemyDefeated: deps.onEnemyDefeated,
       onAttackResult: deps.onAttackResult,
+      onRiskyHit: (count) => this.grantRiskEnergy(8 * count),
     });
   }
 
   initialize(now: number): void {
     this.lastMeaningfulActionTime = now;
+    this.lastEnergyTickTime = now;
   }
 
   spawnEnemies(spawnPoints: Array<{ x: number; y: number; speed: number; damage: number }>): void {
@@ -77,6 +87,49 @@ export class LevelCombatController {
 
   tryAttack(time: number): boolean {
     return this.attackController.tryAttack(time);
+  }
+
+  trySpiritStrike(): boolean {
+    if (this.spiritEnergy < SPIRIT_STRIKE_COST) {
+      this.deps.onAttackResult('Недостаточно энергии духа для безопасного удара (Q).');
+      return false;
+    }
+
+    const target = this.getClosestEnemyInRange(SPIRIT_STRIKE_RANGE);
+    if (!target) {
+      this.deps.onAttackResult('Нет цели для дальнего удара. Держи дистанцию и кайти врагов.');
+      return false;
+    }
+
+    this.consumeSpiritEnergy(SPIRIT_STRIKE_COST);
+    this.deps.onMeaningfulAction(true);
+    target.hp = Math.max(0, target.hp - SPIRIT_STRIKE_DAMAGE);
+    target.staggerUntil = this.scene.time.now + 260;
+    target.sprite.setTint(0x7afcff);
+    this.scene.time.delayedCall(140, () => target.sprite.active && target.sprite.clearTint());
+
+    const bolt = this.scene.add.line(
+      0,
+      0,
+      this.deps.player.x,
+      this.deps.player.y,
+      target.sprite.x,
+      target.sprite.y,
+      0x8be9fd,
+      0.9,
+    );
+    bolt.setLineWidth(2, 5).setDepth(11);
+    this.scene.tweens.add({ targets: bolt, alpha: 0, duration: 120, onComplete: () => bolt.destroy() });
+
+    if (target.hp <= 0) {
+      target.sprite.disableBody(true, true);
+      this.deps.onEnemyDefeated();
+      this.deps.onAttackResult('Безопасный удар из дистанции сработал: цель уничтожена!', true);
+    } else {
+      this.deps.onAttackResult('Безопасный удар: держи дистанцию и добивай врагов через кайт.', true);
+    }
+
+    return true;
   }
 
   tryDash(time: number, moveDirection: Phaser.Math.Vector2): boolean {
@@ -114,6 +167,8 @@ export class LevelCombatController {
 
       if (distance <= 64 && time - enemyState.lastHitTime >= PLAYER_HIT_COOLDOWN_MS) this.onEnemyTouchPlayer(enemyState);
     });
+
+    this.regenSpiritEnergy(time);
   }
 
   maybeTriggerDowntimeEvent(time: number, portalUnlocked: boolean): void {
@@ -135,6 +190,14 @@ export class LevelCombatController {
 
   getLastDashTime(): number {
     return this.lastDashTime;
+  }
+
+  getSpiritEnergy(): number {
+    return this.spiritEnergy;
+  }
+
+  getStrategyHint(): string {
+    return this.spiritEnergy >= SPIRIT_STRIKE_COST ? 'Безопасно: Q (дальний удар)' : 'Риск: ближний бой для бонуса';
   }
 
   markMeaningfulAction(): void {
@@ -187,5 +250,42 @@ export class LevelCombatController {
     enemyState.staggerUntil = now + 110;
 
     this.deps.onEnemyHitPlayer(enemyState.damage);
+  }
+
+  private getClosestEnemyInRange(range: number): EnemyState | null {
+    let closest: EnemyState | null = null;
+    let closestDistance = Infinity;
+
+    this.getAliveEnemies().forEach((enemyState) => {
+      const distance = Phaser.Math.Distance.Between(this.deps.player.x, this.deps.player.y, enemyState.sprite.x, enemyState.sprite.y);
+      if (distance <= range && distance < closestDistance) {
+        closest = enemyState;
+        closestDistance = distance;
+      }
+    });
+
+    return closest;
+  }
+
+  private grantRiskEnergy(value: number): void {
+    this.spiritEnergy = Phaser.Math.Clamp(this.spiritEnergy + value, 0, SPIRIT_ENERGY_MAX);
+  }
+
+  private consumeSpiritEnergy(value: number): void {
+    this.spiritEnergy = Phaser.Math.Clamp(this.spiritEnergy - value, 0, SPIRIT_ENERGY_MAX);
+  }
+
+  private regenSpiritEnergy(time: number): void {
+    const deltaSeconds = (time - this.lastEnergyTickTime) / 1000;
+    if (deltaSeconds <= 0) return;
+
+    this.lastEnergyTickTime = time;
+    const dangerRadius = 200;
+    const hasNearbyEnemy = this.getAliveEnemies().some(
+      (enemyState) => Phaser.Math.Distance.Between(this.deps.player.x, this.deps.player.y, enemyState.sprite.x, enemyState.sprite.y) <= dangerRadius,
+    );
+
+    const regenPerSecond = hasNearbyEnemy ? SPIRIT_RISK_REGEN_PER_SEC : SPIRIT_PASSIVE_REGEN_PER_SEC;
+    this.spiritEnergy = Phaser.Math.Clamp(this.spiritEnergy + regenPerSecond * deltaSeconds, 0, SPIRIT_ENERGY_MAX);
   }
 }
