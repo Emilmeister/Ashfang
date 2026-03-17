@@ -14,6 +14,8 @@ const ATTACK_DAMAGE = 25;
 const ATTACK_ARC_HALF_ANGLE = Phaser.Math.DegToRad(62);
 const BOSS_MAX_HP = 320;
 const BOSS_DAMAGE = 19;
+const BOSS_SPEED = 128;
+const BOSS_CONTACT_RANGE = 80;
 
 const ATTACK_SFX_KEY = 'sfx-player-attack';
 const PLAYER_HIT_SFX_KEY = 'sfx-player-hit';
@@ -264,13 +266,13 @@ export class BossScene extends Phaser.Scene {
 
     if (distance > 4) {
       chase.normalize();
-      this.boss.setVelocity(chase.x * 128, chase.y * 128);
+      this.boss.setVelocity(chase.x * BOSS_SPEED, chase.y * BOSS_SPEED);
       this.boss.setFlipX(chase.x < 0);
     } else {
       this.boss.setVelocity(0, 0);
     }
 
-    if (distance <= 80) {
+    if (distance <= BOSS_CONTACT_RANGE) {
       this.onBossHitPlayer();
     }
   }
@@ -333,24 +335,26 @@ export class BossScene extends Phaser.Scene {
   }
 
   private endWithVictory(): void {
-    this.ending = true;
-    this.statusText.setText('Статус: Победа');
+    this.startEndState('Статус: Победа');
     this.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.36 });
     this.boss.disableBody(true, true);
-    this.player.setVelocity(0, 0);
     this.playVictoryEpilogue();
   }
 
   private endWithFailure(): void {
+    this.startEndState('Статус: Поражение');
+    this.dialogueText.setText('Ashfang пал от босса. Нажми R для повторной попытки.');
+    this.input.keyboard?.once('keydown-R', () => this.scene.restart({ playerHp: PLAYER_MAX_HP }));
+  }
+
+  private startEndState(statusText: string): void {
     this.ending = true;
-    this.statusText.setText('Статус: Поражение');
+    this.statusText.setText(statusText);
     this.player.setVelocity(0, 0);
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body | null;
     if (playerBody) {
       playerBody.enable = false;
     }
-    this.dialogueText.setText('Ashfang пал от босса. Нажми R для повторной попытки.');
-    this.input.keyboard?.once('keydown-R', () => this.scene.restart({ playerHp: PLAYER_MAX_HP }));
   }
 
   private updateHud(): void {
