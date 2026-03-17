@@ -14,6 +14,11 @@ const ATTACK_DAMAGE = 25;
 const BOSS_MAX_HP = 320;
 const BOSS_DAMAGE = 19;
 
+const ATTACK_SFX_KEY = 'sfx-player-attack';
+const PLAYER_HIT_SFX_KEY = 'sfx-player-hit';
+const ENEMY_DOWN_SFX_KEY = 'sfx-enemy-down';
+const UI_CONFIRM_SFX_KEY = 'sfx-ui-confirm';
+
 export class BossScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
 
@@ -223,6 +228,7 @@ export class BossScene extends Phaser.Scene {
     }
 
     this.playerLastHitTime = now;
+    this.sound.play(PLAYER_HIT_SFX_KEY, { volume: 0.44 });
     this.playerHp = Math.max(0, this.playerHp - BOSS_DAMAGE);
     this.player.setTintFill(0xff5f5f);
     this.time.delayedCall(110, () => this.player.clearTint());
@@ -254,6 +260,7 @@ export class BossScene extends Phaser.Scene {
       return;
     }
 
+    this.sound.play(ATTACK_SFX_KEY, { volume: 0.5 });
     this.bossHp = Math.max(0, this.bossHp - ATTACK_DAMAGE);
     this.boss.setTintFill(0xffffff);
     this.time.delayedCall(90, () => this.boss.clearTint());
@@ -267,10 +274,14 @@ export class BossScene extends Phaser.Scene {
   private endWithVictory(): void {
     this.ending = true;
     this.statusText.setText('Статус: Победа');
+    this.sound.play(ENEMY_DOWN_SFX_KEY, { volume: 0.36 });
     this.boss.disableBody(true, true);
     this.player.setVelocity(0, 0);
     this.dialogueText.setText('Победа! Сердце руин очищено. Нажми ENTER для возврата в меню.');
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('Menu'));
+    this.input.keyboard?.once('keydown-ENTER', () => {
+      this.sound.play(UI_CONFIRM_SFX_KEY, { volume: 0.45 });
+      this.scene.start('Menu');
+    });
   }
 
   private endWithFailure(): void {
